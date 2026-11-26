@@ -1,0 +1,12 @@
+wait 300
+wav m1_dr.wav
+midi C0 09 00
+wait 100
+midi 90 18 7F
+wait 50
+midi 80 18 00
+wait 1500
+midi 99 24 7F
+wait 50
+midi 89 24 00
+wait 1500

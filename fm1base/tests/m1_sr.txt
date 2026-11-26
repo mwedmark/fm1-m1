@@ -1,0 +1,8 @@
+wait 300
+wav m1_sr.wav
+midi C0 39 00
+wait 50
+midi 90 45 64
+wait 1000
+midi 80 45 00
+wait 300

@@ -1,0 +1,389 @@
+wait 300
+wav m1_ltas.wav
+midi C0 5B 00
+wait 60
+midi 90 30 5A
+wait 700
+midi 80 30 00
+wait 250
+midi 90 34 5A
+wait 700
+midi 80 34 00
+wait 250
+midi 90 38 5A
+wait 700
+midi 80 38 00
+wait 250
+midi 90 3C 5A
+wait 700
+midi 80 3C 00
+wait 250
+midi 90 40 5A
+wait 700
+midi 80 40 00
+wait 250
+midi 90 44 5A
+wait 700
+midi 80 44 00
+wait 250
+midi 90 48 5A
+wait 700
+midi 80 48 00
+wait 250
+midi 90 4C 5A
+wait 700
+midi 80 4C 00
+wait 250
+midi 90 50 5A
+wait 700
+midi 80 50 00
+wait 250
+midi 90 54 5A
+wait 700
+midi 80 54 00
+wait 250
+wait 800
+midi C0 0F 00
+wait 60
+midi 90 30 5A
+wait 700
+midi 80 30 00
+wait 250
+midi 90 34 5A
+wait 700
+midi 80 34 00
+wait 250
+midi 90 38 5A
+wait 700
+midi 80 38 00
+wait 250
+midi 90 3C 5A
+wait 700
+midi 80 3C 00
+wait 250
+midi 90 40 5A
+wait 700
+midi 80 40 00
+wait 250
+midi 90 44 5A
+wait 700
+midi 80 44 00
+wait 250
+midi 90 48 5A
+wait 700
+midi 80 48 00
+wait 250
+midi 90 4C 5A
+wait 700
+midi 80 4C 00
+wait 250
+midi 90 50 5A
+wait 700
+midi 80 50 00
+wait 250
+midi 90 54 5A
+wait 700
+midi 80 54 00
+wait 250
+wait 800
+midi C0 17 00
+wait 60
+midi 90 30 5A
+wait 700
+midi 80 30 00
+wait 250
+midi 90 34 5A
+wait 700
+midi 80 34 00
+wait 250
+midi 90 38 5A
+wait 700
+midi 80 38 00
+wait 250
+midi 90 3C 5A
+wait 700
+midi 80 3C 00
+wait 250
+midi 90 40 5A
+wait 700
+midi 80 40 00
+wait 250
+midi 90 44 5A
+wait 700
+midi 80 44 00
+wait 250
+midi 90 48 5A
+wait 700
+midi 80 48 00
+wait 250
+midi 90 4C 5A
+wait 700
+midi 80 4C 00
+wait 250
+midi 90 50 5A
+wait 700
+midi 80 50 00
+wait 250
+midi 90 54 5A
+wait 700
+midi 80 54 00
+wait 250
+wait 800
+midi C0 19 00
+wait 60
+midi 90 30 5A
+wait 700
+midi 80 30 00
+wait 250
+midi 90 34 5A
+wait 700
+midi 80 34 00
+wait 250
+midi 90 38 5A
+wait 700
+midi 80 38 00
+wait 250
+midi 90 3C 5A
+wait 700
+midi 80 3C 00
+wait 250
+midi 90 40 5A
+wait 700
+midi 80 40 00
+wait 250
+midi 90 44 5A
+wait 700
+midi 80 44 00
+wait 250
+midi 90 48 5A
+wait 700
+midi 80 48 00
+wait 250
+midi 90 4C 5A
+wait 700
+midi 80 4C 00
+wait 250
+midi 90 50 5A
+wait 700
+midi 80 50 00
+wait 250
+midi 90 54 5A
+wait 700
+midi 80 54 00
+wait 250
+wait 800
+midi C0 1A 00
+wait 60
+midi 90 30 5A
+wait 700
+midi 80 30 00
+wait 250
+midi 90 34 5A
+wait 700
+midi 80 34 00
+wait 250
+midi 90 38 5A
+wait 700
+midi 80 38 00
+wait 250
+midi 90 3C 5A
+wait 700
+midi 80 3C 00
+wait 250
+midi 90 40 5A
+wait 700
+midi 80 40 00
+wait 250
+midi 90 44 5A
+wait 700
+midi 80 44 00
+wait 250
+midi 90 48 5A
+wait 700
+midi 80 48 00
+wait 250
+midi 90 4C 5A
+wait 700
+midi 80 4C 00
+wait 250
+midi 90 50 5A
+wait 700
+midi 80 50 00
+wait 250
+midi 90 54 5A
+wait 700
+midi 80 54 00
+wait 250
+wait 800
+midi C0 1B 00
+wait 60
+midi 90 30 5A
+wait 700
+midi 80 30 00
+wait 250
+midi 90 34 5A
+wait 700
+midi 80 34 00
+wait 250
+midi 90 38 5A
+wait 700
+midi 80 38 00
+wait 250
+midi 90 3C 5A
+wait 700
+midi 80 3C 00
+wait 250
+midi 90 40 5A
+wait 700
+midi 80 40 00
+wait 250
+midi 90 44 5A
+wait 700
+midi 80 44 00
+wait 250
+midi 90 48 5A
+wait 700
+midi 80 48 00
+wait 250
+midi 90 4C 5A
+wait 700
+midi 80 4C 00
+wait 250
+midi 90 50 5A
+wait 700
+midi 80 50 00
+wait 250
+midi 90 54 5A
+wait 700
+midi 80 54 00
+wait 250
+wait 800
+midi C0 1E 00
+wait 60
+midi 90 30 5A
+wait 700
+midi 80 30 00
+wait 250
+midi 90 34 5A
+wait 700
+midi 80 34 00
+wait 250
+midi 90 38 5A
+wait 700
+midi 80 38 00
+wait 250
+midi 90 3C 5A
+wait 700
+midi 80 3C 00
+wait 250
+midi 90 40 5A
+wait 700
+midi 80 40 00
+wait 250
+midi 90 44 5A
+wait 700
+midi 80 44 00
+wait 250
+midi 90 48 5A
+wait 700
+midi 80 48 00
+wait 250
+midi 90 4C 5A
+wait 700
+midi 80 4C 00
+wait 250
+midi 90 50 5A
+wait 700
+midi 80 50 00
+wait 250
+midi 90 54 5A
+wait 700
+midi 80 54 00
+wait 250
+wait 800
+midi C0 23 00
+wait 60
+midi 90 30 5A
+wait 700
+midi 80 30 00
+wait 250
+midi 90 34 5A
+wait 700
+midi 80 34 00
+wait 250
+midi 90 38 5A
+wait 700
+midi 80 38 00
+wait 250
+midi 90 3C 5A
+wait 700
+midi 80 3C 00
+wait 250
+midi 90 40 5A
+wait 700
+midi 80 40 00
+wait 250
+midi 90 44 5A
+wait 700
+midi 80 44 00
+wait 250
+midi 90 48 5A
+wait 700
+midi 80 48 00
+wait 250
+midi 90 4C 5A
+wait 700
+midi 80 4C 00
+wait 250
+midi 90 50 5A
+wait 700
+midi 80 50 00
+wait 250
+midi 90 54 5A
+wait 700
+midi 80 54 00
+wait 250
+wait 800
+midi C0 2D 00
+wait 60
+midi 90 30 5A
+wait 700
+midi 80 30 00
+wait 250
+midi 90 34 5A
+wait 700
+midi 80 34 00
+wait 250
+midi 90 38 5A
+wait 700
+midi 80 38 00
+wait 250
+midi 90 3C 5A
+wait 700
+midi 80 3C 00
+wait 250
+midi 90 40 5A
+wait 700
+midi 80 40 00
+wait 250
+midi 90 44 5A
+wait 700
+midi 80 44 00
+wait 250
+midi 90 48 5A
+wait 700
+midi 80 48 00
+wait 250
+midi 90 4C 5A
+wait 700
+midi 80 4C 00
+wait 250
+midi 90 50 5A
+wait 700
+midi 80 50 00
+wait 250
+midi 90 54 5A
+wait 700
+midi 80 54 00
+wait 250
+wait 800

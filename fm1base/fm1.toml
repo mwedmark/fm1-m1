@@ -1,0 +1,33 @@
+# M1 på fm1-base (tools/build.py i en fm1-base-checkout med data_lo, som fm1-d50). Bygg:
+#   python3 tools/build.py ../fm1-m1/fm1base --no-ble          (i fm1-base, bredvid det här repot)
+name = "M1"
+id_prefix = "FM-1_61"
+usb_manufacturer = "fm1-m1"
+usb_product = "M1 FM-1"
+# appen i [0x4000, 0x34000) (192 KB: bilden är ~148 KB), dataområdet från 0x34000, så stort som möjligt för sampel. Ljudbanken (FM1B) ligger i resursregionen
+# 0x34000 .. 0xDE000, 696 320 B (app.h APP_RES_BASE), panelens kalibrering i 0xDE000..0xDFFFF, inställningarna i 0xFC000
+data_lo = 0x34000
+# användarens egen bank (aldrig Korgs data i repot eller i en publicerad build): valfri vid byggtid
+resources = "../roms/out/m1.fm1b"
+resources_what = "M1 data"
+resources_var = true
+resources_magic = "FM1B"
+backup = true
+emu = ["data"]
+words = "words.tsv"
+ble = false
+cpu2 = false
+o2 = ["m1_unit.c", "m1_fx.c", "m1_fx2.c", "../engine/sf2fx.c", "../engine/sf2out.c", "../engine/live_cache/sound_cache.c", "../engine/live_cache/mp3_sound.c"]
+o2_cflags = ["-DFM1_BASE=1"]
+o2_include = ["m1_cfg.h"]
+include = ["../engine", "../engine/live_cache", "../engine/third_party/mp3"]
+device_include = ["inc"]
+vendored = ["../engine/"]
+tagline = "a Korg M1-style synth on the FM-1"
+repo = "https://github.com/mwedmark/fm1-m1"
+licence = "GPL-3.0-only"
+author = "mwedmark"
+description = "A Korg M1 on the FM-1, played from your own ROM dump: fm1-sf2's sample engine on fm1-base, with the M1's factory programs, drum kits and effects."
+tags = ["synth"]
+install = "https://mwedmark.github.io/fm1-m1/install/"
+screenshot = "docs/img/screen.png"

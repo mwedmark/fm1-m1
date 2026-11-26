@@ -1,0 +1,4 @@
+wait 400
+tap EDIT
+wait 200
+shot screen.png

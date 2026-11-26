@@ -1,0 +1,22 @@
+wait 300
+wav m1_rv.wav
+midi C0 2B 00
+wait 100
+midi 90 3C 7F
+midi 90 40 7F
+midi 90 43 7F
+wait 1500
+midi 80 3C 00
+midi 80 40 00
+midi 80 43 00
+wait 3000
+midi C0 2B 00
+wait 100
+midi 90 3C 3C
+midi 90 40 3C
+midi 90 43 3C
+wait 1500
+midi 80 3C 00
+midi 80 40 00
+midi 80 43 00
+wait 3000

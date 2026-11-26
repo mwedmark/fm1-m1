@@ -1,0 +1,8 @@
+wait 300
+wav m1_dly.wav
+midi C0 27 00
+wait 50
+midi 90 3C 64
+wait 100
+midi 80 3C 00
+wait 2500

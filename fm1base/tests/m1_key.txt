@@ -1,0 +1,16 @@
+wait 300
+wav m1_key.wav
+midi C0 5B 00
+wait 200
+key 0 down 127
+wait 1500
+key 0 up
+wait 700
+key 7 down 127
+key 11 down 127
+key 14 down 127
+wait 1500
+key 7 up
+key 11 up
+key 14 up
+wait 500

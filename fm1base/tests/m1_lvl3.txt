@@ -1,0 +1,79 @@
+wait 300
+wav m1_lvl.wav
+midi C0 5B 00
+midi B0 07 7F
+wait 100
+midi 90 3C 7F
+midi 90 40 7F
+midi 90 43 7F
+wait 1200
+midi 80 3C 00
+midi 80 40 00
+midi 80 43 00
+wait 700
+midi C0 5B 00
+midi B0 07 76
+wait 100
+midi 90 3C 7F
+midi 90 40 7F
+midi 90 43 7F
+wait 1200
+midi 80 3C 00
+midi 80 40 00
+midi 80 43 00
+wait 700
+midi C0 5B 00
+midi B0 07 6E
+wait 100
+midi 90 3C 7F
+midi 90 40 7F
+midi 90 43 7F
+wait 1200
+midi 80 3C 00
+midi 80 40 00
+midi 80 43 00
+wait 700
+midi C0 5B 00
+midi B0 07 64
+wait 100
+midi 90 3C 7F
+midi 90 40 7F
+midi 90 43 7F
+wait 1200
+midi 80 3C 00
+midi 80 40 00
+midi 80 43 00
+wait 700
+midi C0 5B 00
+midi B0 07 5A
+wait 100
+midi 90 3C 7F
+midi 90 40 7F
+midi 90 43 7F
+wait 1200
+midi 80 3C 00
+midi 80 40 00
+midi 80 43 00
+wait 700
+midi C0 5B 00
+midi B0 07 50
+wait 100
+midi 90 3C 7F
+midi 90 40 7F
+midi 90 43 7F
+wait 1200
+midi 80 3C 00
+midi 80 40 00
+midi 80 43 00
+wait 700
+midi C0 5B 00
+midi B0 07 40
+wait 100
+midi 90 3C 7F
+midi 90 40 7F
+midi 90 43 7F
+wait 1200
+midi 80 3C 00
+midi 80 40 00
+midi 80 43 00
+wait 700

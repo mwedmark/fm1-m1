@@ -1,0 +1,14 @@
+wait 300
+wav m1_pitch.wav
+midi C0 01 00
+wait 50
+midi 90 3C 64
+wait 1500
+midi 80 3C 00
+wait 1000
+midi C0 25 00
+wait 50
+midi 90 3C 64
+wait 1500
+midi 80 3C 00
+wait 1000

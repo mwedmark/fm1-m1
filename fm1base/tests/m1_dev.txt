@@ -1,0 +1,16 @@
+wait 300
+wav m1_dev.wav
+midi C0 5B 00
+wait 200
+midi 90 3C 64
+midi 90 40 64
+midi 90 43 64
+wait 1500
+midi 80 3C 00
+midi 80 40 00
+midi 80 43 00
+wait 700
+midi 90 41 64
+wait 1500
+midi 80 41 00
+wait 700

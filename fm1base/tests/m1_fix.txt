@@ -1,0 +1,24 @@
+# Universe (0), Brass 1 (2), Symphonic (7): håll ett ackord 2 s vardera
+wait 300
+wav m1_fix.wav
+midi C0 00 00
+midi 90 3C 64
+midi 90 43 64
+wait 2000
+midi 80 3C 00
+midi 80 43 00
+wait 800
+midi C0 02 00
+midi 90 3C 64
+midi 90 43 64
+wait 2000
+midi 80 3C 00
+midi 80 43 00
+wait 800
+midi C0 07 00
+midi 90 3C 64
+midi 90 43 64
+wait 2000
+midi 80 3C 00
+midi 80 43 00
+wait 800

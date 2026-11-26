@@ -1,0 +1,202 @@
+wait 300
+wav m1_cmp.wav
+midi C0 5B 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 01 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 0B 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 0A 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 0D 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 05 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 07 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 17 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 1B 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 00 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 03 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 0F 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 10 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 19 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 1C 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 1E 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 24 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 28 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 2F 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400
+midi C0 3C 00
+wait 60
+midi 90 41 6E
+midi 90 45 6E
+midi 90 48 6E
+wait 900
+midi 80 41 00
+midi 80 45 00
+midi 80 48 00
+wait 400

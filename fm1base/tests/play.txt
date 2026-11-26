@@ -1,0 +1,20 @@
+# Första röktestet: banken binds, ett ackord låter, PRESET byter program
+wait 300
+shot boot.png
+wav chord.wav
+key 0 down 100
+key 4 down 100
+key 7 down 100
+wait 1200
+key 0 up
+key 4 up
+key 7 up
+wait 800
+turn PRESET 1
+wait 200
+key 12 down 90
+wait 800
+key 12 up
+wait 800
+wavstop
+shot after.png

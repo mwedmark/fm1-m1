@@ -1,0 +1,38 @@
+wait 300
+wav m1_wob.wav
+midi C0 5B 00
+wait 100
+midi 90 41 64
+wait 900
+midi 80 41 00
+wait 500
+midi C0 64 00
+wait 100
+midi 90 41 64
+wait 900
+midi 80 41 00
+wait 500
+midi C0 65 00
+wait 100
+midi 90 41 64
+wait 900
+midi 80 41 00
+wait 500
+midi C0 66 00
+wait 100
+midi 90 41 64
+wait 900
+midi 80 41 00
+wait 500
+midi C0 67 00
+wait 100
+midi 90 41 64
+wait 900
+midi 80 41 00
+wait 500
+midi C0 68 00
+wait 100
+midi 90 41 64
+wait 900
+midi 80 41 00
+wait 500

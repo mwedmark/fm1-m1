@@ -1,0 +1,12 @@
+wait 300
+wav m1_vel.wav
+midi C0 01 00
+wait 50
+midi 90 3C 1E
+wait 800
+midi 80 3C 00
+wait 700
+midi 90 3C 78
+wait 800
+midi 80 3C 00
+wait 700

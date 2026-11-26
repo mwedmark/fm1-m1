@@ -1,0 +1,12 @@
+wait 300
+wav m1_atk.wav
+midi C0 5B 00
+wait 200
+midi 90 35 64
+wait 1200
+midi 80 35 00
+wait 600
+midi 90 41 64
+wait 1200
+midi 80 41 00
+wait 400

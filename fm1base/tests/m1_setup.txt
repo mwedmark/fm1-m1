@@ -1,0 +1,22 @@
+# FM-1 Setup: röstgräns 32 -> 8, SAVE, omstart, och att gränsen håller
+wait 400
+tap EDIT
+wait 100
+shot setup_32.png
+turn K2 -24
+wait 100
+shot setup_8.png
+tap SAVE
+wait 300
+tap EDIT
+wait 100
+midi C0 00 00
+strum 0 20 5
+wait 50
+shot play8.png
+wait 800
+reboot
+wait 500
+tap EDIT
+wait 100
+shot setup_after_reboot.png

@@ -1,0 +1,14 @@
+wait 300
+wav od.wav
+midi C0 4A 00
+wait 100
+midi 90 30 64
+midi 90 37 64
+midi 90 3C 64
+midi 90 40 64
+wait 2500
+midi 80 30 00
+midi 80 37 00
+midi 80 3C 00
+midi 80 40 00
+wait 500

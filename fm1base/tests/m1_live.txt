@@ -1,0 +1,39 @@
+# M1-banken med live cache: piano (0), program 31 Strings, 5 Organ 1, trummor över MIDI kanal 10
+wait 300
+wav m1_live.wav
+key 0 down 100
+key 4 down 100
+key 7 down 100
+wait 1500
+key 0 up
+key 4 up
+key 7 up
+wait 600
+midi C0 1F 00
+wait 100
+midi 90 3C 64
+midi 90 40 64
+midi 90 43 64
+wait 1500
+midi 80 3C 00
+midi 80 40 00
+midi 80 43 00
+wait 600
+midi C0 05 00
+wait 100
+midi 90 3C 64
+wait 1000
+midi 80 3C 00
+wait 500
+midi C9 00 00
+wait 100
+midi 99 24 64
+wait 300
+midi 99 27 64
+wait 300
+midi 99 2E 64
+wait 300
+midi 99 32 64
+wait 1200
+wavstop
+shot m1_live.png

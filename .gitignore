@@ -1,0 +1,20 @@
+# Korgs ROM:ar och dumpar: aldrig i repot
+roms/
+*.rom
+*.syx
+m1_pcm.bin
+Korg_M1*.zip
+dist/
+__pycache__/
+node_modules/
+
+# Användarens egna M1-dumpar
+M1 files/
+fm1base/build/
+fm1base/web/words/
+emu/
+
+# Utvecklingsmiljön, och ett första utkast till en egen motor som inte används (README.md)
+.claude/
+src/
+include/

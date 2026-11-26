@@ -1,0 +1,56 @@
+wait 400
+tap EDIT
+turn K2 -24
+tap EDIT
+wait 100
+midi C0 00 00
+midi 90 28 64
+midi 90 29 64
+midi 90 2A 64
+midi 90 2B 64
+midi 90 2C 64
+midi 90 2D 64
+midi 90 2E 64
+midi 90 2F 64
+midi 90 30 64
+midi 90 31 64
+midi 90 32 64
+midi 90 33 64
+midi 90 34 64
+midi 90 35 64
+midi 90 36 64
+midi 90 37 64
+wait 600
+shot cap8.png
+midi B0 7B 00
+wait 800
+tap EDIT
+turn K2 24
+tap EDIT
+wait 100
+midi 90 28 64
+midi 90 29 64
+midi 90 2A 64
+midi 90 2B 64
+midi 90 2C 64
+midi 90 2D 64
+midi 90 2E 64
+midi 90 2F 64
+midi 90 30 64
+midi 90 31 64
+midi 90 32 64
+midi 90 33 64
+midi 90 34 64
+midi 90 35 64
+midi 90 36 64
+midi 90 37 64
+midi 90 38 64
+midi 90 39 64
+midi 90 3A 64
+midi 90 3B 64
+midi 90 3C 64
+midi 90 3D 64
+midi 90 3E 64
+midi 90 3F 64
+wait 600
+shot cap32.png

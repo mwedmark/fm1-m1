@@ -1,0 +1,8 @@
+wait 300
+wav m1_fx.wav
+midi C0 55 00
+wait 50
+midi 90 45 64
+wait 600
+midi 80 45 00
+wait 100

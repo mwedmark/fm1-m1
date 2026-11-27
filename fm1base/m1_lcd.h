@@ -181,8 +181,9 @@ static void m1_lcd_prog_page(char row[2][40], uint32_t n, const char *name, int 
         row[1][i] = offs[i];
 }
 
-/* the whole display into the canvas, the top of the glass at y0 (the canvas is 240 wide); returns the glass's height */
-static int32_t m1_lcd_draw(uint32_t view, uint32_t col, char row[2][40], int32_t y0)
+/* the whole display into the canvas, the top of the glass at y0 (the canvas is 240 wide); returns the glass's height. cursor: 0..79 puts the
+ * underline (the eighth dot row) under that character, -1 none */
+static int32_t m1_lcd_draw(uint32_t view, uint32_t col, char row[2][40], int32_t y0, int32_t cursor)
 {
     const m1_lcd_pal_t *p = &m1_lcd_pals[col < M1_COLS ? col : 0];
     int32_t s = view == M1_VIEW_2X20 ? 2 : 1, pad = 2 * s, r, h, x, y, k, half;
@@ -197,6 +198,8 @@ static int32_t m1_lcd_draw(uint32_t view, uint32_t col, char row[2][40], int32_t
             for (k = 0; k < n; k++) {
                 x = k * cw;
                 m1_lcd_char(x, y, s, (uint8_t)row[r][half * 20 + k], p);
+                if (cursor == r * 40 + half * 20 + k)
+                    cv_rect(x, y + 7 * s, 5 * s, s, p->fg);
             }
         }
     return h;

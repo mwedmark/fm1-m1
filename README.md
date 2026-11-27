@@ -60,14 +60,21 @@ it shows its function on the LCD for a moment and does nothing when released. Wh
 | HOME | PROG (play) | yes: back to the play page |
 | PLAY | COMBI (play) | not yet |
 | EDIT | EDIT (program or combination) | not yet |
-| GLO | GLOBAL | not yet |
+| GLO | GLOBAL | yes: the Global pages (below) |
 | SEQ | SEQ | not yet |
 | ARP | the FM-1's own: Setup (voices, LCD view, colours) | yes (was EDIT) |
 | SAVE | the FM-1's own: keeps the settings | yes |
 | OCT- / OCT+ | the FM-1's own: octave for the keys | yes |
 | FX, SEL, ENV, LFO, REC | none yet | |
 
-The PRESET encoder is the M1's +1/-1 (program select). The digits, PAGE and the eight quick parameters (O F L K V A R E) have no button on the FM-1;
+The PRESET encoder is the M1's +1/-1 (program select; the value of the parameter on a Global page).
+
+**Global** (GLO): the pages are the OS's own, 20 of them, drawn as it draws them. SELECT turns the pages (the M1's PAGE), K1 chooses the parameter (the M1's
+eight keys under the display), PRESET changes the value (+1/-1); the cursor blinks under the parameter. SAVE keeps the values. What the firmware does with them:
+Master Tune (-50..+50 cents, for notes that start afterwards), Key Transpose (-12..+12, the keys and incoming notes), Local ON/OFF, and the MIDI filters for program
+changes and controllers. The rest are kept and shown and do nothing on the FM-1 (pedals, scale type, common channel, clock source, aftertouch, SysEx, memory
+protect). The user scale, the four drum kits and the pages for memory allocation, dump and cards are shown as pictures, without editing. Without the page
+table in the resource (above) the page shows `NO M1 DATA`. The digits, PAGE and the eight quick parameters (O F L K V A R E) have no button on the FM-1;
 SELECT and K1..K4 are free for them.
 
 ## Tools
@@ -119,7 +126,18 @@ node ..\fm1-sf2\pack_bank.js roms\gen\m1_bfp8.fm1b roms\out\m1.fm1b --kbit 64 --
 ```
 
 ```powershell
-python -I tools/m1_fxtable.py roms\gen\m1_patches.json roms\gen\m1_packed.fm1b roms\out\m1.fm1b
+python -I tools/m1_fxtable.py roms\gen\m1_patches.json roms\gen\m1_packed.fm1b roms\out\m1_fx.fm1b
+```
+
+The M1's Global pages (texts, parameters and values) are read out of the OS of your own M1, in the emulator, into a table that goes last in the resource
+region (about 3 KB, ~30 s; docs/M1_LCD.md):
+
+```powershell
+python -I tools/m1_pages.py "M1 files\rev19-ic23-880219.bin" "M1 files\rev19-ic32-880319.bin" roms\gen\m1_pages.bin
+```
+
+```powershell
+python -I tools/m1_pages.py --append roms\gen\m1_pages.bin roms\out\m1_fx.fm1b roms\out\m1.fm1b
 ```
 
 `tools/fm1b_make_bank.js` is fm1-sf2's `make_bank.js` with the M1's velocity in the modulation record (44 bytes); it reads the

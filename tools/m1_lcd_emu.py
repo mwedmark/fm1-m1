@@ -39,8 +39,13 @@ class Lcd:
         self.cg = [0] * 64
         self.pos = 0
         self.cgram = False
+        self.display = 0x0C                          # the last display-control command: bit 1 cursor (underline), bit 0 blink
+        self.ncmd = 0
 
     def command(self, v):
+        self.ncmd += 1
+        if v & 0xF8 == 0x08:
+            self.display = v
         if v == 1:
             self.dd = [0x20] * 80
             self.pos, self.cgram = 0, False
@@ -181,6 +186,22 @@ class Machine:
             self.keys[row] |= 1 << col
         else:
             self.keys[row] &= ~(1 << col)
+
+    CURSOR_IDX = 0x94C5                             # DS offset of the OS's cursor position, 0..79 (row * 40 + column)
+
+    def cursor_index(self):
+        return self.mu.mem_read(phys(DS, self.CURSOR_IDX), 1)[0]
+
+    def screen(self):
+        return bytes(self.lcd.dd[:80])
+
+    def tap(self, row, col, hold=800_000, settle=1_500_000):
+        """Press, hold and release a panel key, then let the OS finish: the LCD is refreshed one character per pass of its main loop, so a screen
+        read too early shows the old one (a hold of less than a full scan of the matrix, ~560 000 instructions, can miss the key)."""
+        self.press(row, col)
+        self.run(hold)
+        self.press(row, col, False)
+        self.run(settle)
 
     def vector_for(self, image_off):
         for v in range(256):

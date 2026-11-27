@@ -10,6 +10,7 @@
 #include "m1_fx2.h"
 #include "m1_setup.h"                          /* FM-1 Setup: non-standard settings, kept apart from the M1's menus */
 #include "m1_lcd.h"                            /* the M1's 40 x 2 LCD: two views, three colour schemes */
+#include "m1_pages.h"                          /* the M1's Global pages, read out of its OS into the resource region */
 #include "m1_keys.h"                           /* the FM-1's buttons as the M1's keys, and the help on a long press */
 
 const int16_t *m1_sea5_dqt(void);               /* m1_unit.c */
@@ -25,9 +26,49 @@ typedef struct {
     uint8_t program;                             /* 0..127 */
     uint8_t setup;                               /* FM-1 Setup (m1_setup.h): the voice limit; 0 in an older record = default */
     uint8_t rsv;
+    uint8_t g[M1_PG_IDS];                        /* the Global pages' values by id: index + 1, 0 = the M1's initial value (m1_pages.h) */
 } settings_t;
+#define SET_V1_SIZE 8u                           /* the record before g: still read */
 static settings_t set;
 static uint8_t set_dirty, bank_ok;
+
+/* The Global pages' ids (the order tools/m1_pages.py gives the parameters of OS v1.9) and what the firmware does with them. The others are kept and
+ * shown, and do nothing on the FM-1: no pedals, no card, no sequencer, one scale. */
+enum { G_TUNE, G_TRANSPOSE, G_DAMPER, G_PEDAL1, G_PEDAL2, G_SCALE, G_CH, G_CLOCK, G_LOCAL, G_F_PROG, G_F_AFTT, G_F_CNTL, G_F_EXCL };
+static struct {
+    int8_t transpose;                            /* Key Transpose, semitones: the panel's keys and incoming notes (not the drums) */
+    uint8_t local;                               /* Local ON: the panel's keys sound here (they always go to USB MIDI) */
+    uint8_t f_prog, f_cntl;                      /* MIDI filtering: program changes and controllers let in */
+} glob = {0, 1, 1, 1};
+
+static void globals_apply(void)
+{
+    const m1_pg_param_t *p;
+    int32_t tune = 0, tr = 0;
+    p = m1_pg_by_id[G_TUNE];
+    if (p)
+        tune = m1_pg_number(p, m1_pg_value(set.g, p));
+    p = m1_pg_by_id[G_TRANSPOSE];
+    if (p)
+        tr = m1_pg_number(p, m1_pg_value(set.g, p));
+    p = m1_pg_by_id[G_LOCAL];
+    {
+        uint8_t local = p ? (uint8_t)m1_pg_value(set.g, p) : 1u;
+        if (local != glob.local && bank_ok)
+            fm1b_panic();                        /* the keys that are down would not find their note off */
+        glob.local = local;
+    }
+    p = m1_pg_by_id[G_F_PROG];
+    glob.f_prog = p ? (uint8_t)m1_pg_value(set.g, p) : 1u;
+    p = m1_pg_by_id[G_F_CNTL];
+    glob.f_cntl = p ? (uint8_t)m1_pg_value(set.g, p) : 1u;
+    if (bank_ok) {
+        fm1b_master_tune(tune);
+        if (tr != glob.transpose)
+            fm1b_panic();                        /* a held note would not find its note off at the other pitch */
+    }
+    glob.transpose = (int8_t)tr;
+}
 
 /* live cache: the MP3 sounds are decoded here (BFP8) when a note needs them. fm1-base's pool (gfx.c and others take the rest) */
 static uint8_t cache_pool[FM1B_CACHE_KB * 1024u] __attribute__((aligned(4), section(".pool")));
@@ -108,6 +149,11 @@ void app_panic(void)
 
 /* ------------------------------------------------------------------- MIDI --- */
 static volatile uint32_t midi_count;
+static uint32_t transposed(uint32_t note)         /* Key Transpose */
+{
+    int32_t n = (int32_t)note + glob.transpose;
+    return (uint32_t)(n < 0 ? 0 : n > 127 ? 127 : n);
+}
 static void midi_in(void)                        /* the main loop: everything that has come in, to the engine's queue */
 {
     uint32_t pkt;
@@ -119,13 +165,13 @@ static void midi_in(void)                        /* the main loop: everything th
         midi_count++;
         switch (st & 0xF0u) {                    /* channel 10 (ch 9): the M1's drum kits in bank 128, program change selects the kit */
         case 0x80u:
-            if (ch == 9u) fm1b_channel_drum_note(ch, d1, 0, 127u); else fm1b_channel_note(ch, d1, 0, 127u);
+            if (ch == 9u) fm1b_channel_drum_note(ch, d1, 0, 127u); else fm1b_channel_note(ch, transposed(d1), 0, 127u);
             break;
         case 0x90u:
-            if (ch == 9u) fm1b_channel_drum_note(ch, d1, d2, 127u); else fm1b_channel_note(ch, d1, d2, 127u);
+            if (ch == 9u) fm1b_channel_drum_note(ch, d1, d2, 127u); else fm1b_channel_note(ch, transposed(d1), d2, 127u);
             break;
-        case 0xB0u: fm1b_channel_control(ch, d1, d2); break;
-        case 0xC0u: fm1b_channel_program(ch, ch == 9u ? 128u : 0u, d1); break;
+        case 0xB0u: if (glob.f_cntl) fm1b_channel_control(ch, d1, d2); break;
+        case 0xC0u: if (glob.f_prog) fm1b_channel_program(ch, ch == 9u ? 128u : 0u, d1); break;
         case 0xE0u: fm1b_channel_bend(ch, d1 | d2 << 7); break;
         default: break;
         }
@@ -179,8 +225,12 @@ int app_sysex(const uint8_t *p, uint32_t n)
 /* --------------------------------------------------------------- settings --- */
 static void settings_load(void)
 {
-    if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) != (int)sizeof set || set.magic != SET_MAGIC ||
+    int n;
+    memset(set.g, 0, sizeof set.g);
+    n = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
+    if ((n != (int)sizeof set && n != (int)SET_V1_SIZE) || set.magic != SET_MAGIC ||
         set.octave < -3 || set.octave > 3 || set.program > 127u) {
+        memset(set.g, 0, sizeof set.g);
         set.magic = SET_MAGIC;
         set.octave = 0;
         set.program = 0;
@@ -192,7 +242,7 @@ static void settings_load(void)
 int app_backup_playing(void) { return bank_ok && fm1b_voices_sounding() != 0u; }
 void app_backup_flush(void) {}
 void app_backup_hold(int on) { (void)on; }
-void app_backup_restored(void) { settings_load(); }
+void app_backup_restored(void) { settings_load(); globals_apply(); }
 
 static void program_select(int32_t step)         /* the next program that the bank has, in that direction */
 {
@@ -213,6 +263,7 @@ void app_init(void)
 {
     uint32_t n = 0, bank_len;
     const uint8_t *p = bank_data(&n);
+    n = m1_pg_init(p, n);                        /* the page table at the end of the resource: what is left is the bank (and the effect table) */
     settings_load();
     fm1b_cache_attach(cache_pool, sizeof cache_pool);
     /* the bank's length is in its header (offset 40); the resource may have the effect table after it (tools/m1_fxtable.py) */
@@ -225,6 +276,7 @@ void app_init(void)
      * gives as much chorus as dry signal (fm1-sf2's default 30 of 127 gave E.Piano 3 a third of the M1's stereo width) */
     sf2fx_set(sf2fx_reverb(), 95u);
     m1_setup_apply(set.setup);
+    globals_apply();
     m1_fx2_init(p, n);                           /* the programs' effect data: the table at the end of the bank */
     if (bank_ok && fm1b_program(0, set.program) < 0) {
         set.program = 127;
@@ -241,6 +293,9 @@ static struct {
     uint8_t field;                               /* the Setup page's field */
     uint32_t down_ms[NB];                        /* when each button went down */
     uint32_t helped;                             /* bit B_*: held long enough, its help has been shown (its release does nothing) */
+    uint8_t glob;                                /* 1 the Global pages (GLO), 0 the play page */
+    uint8_t gpage, gsel;                         /* the Global page, and the selected parameter on it */
+    uint8_t blink;                               /* the cursor's phase */
     char ovl[2][40];                             /* a notice drawn on the LCD in place of the page: a button's help, or "not done yet" */
     uint32_t ovl_until;
 } ui;
@@ -264,8 +319,15 @@ void app_say(const char *a, const char *b)
 static void key_action(uint32_t k)
 {
     switch (m1_keymap[k].fn) {
+    case M1K_GLOBAL:                             /* the Global pages: SELECT turns the pages, K1 the parameter, PRESET its value */
+        ui.page = 0;
+        ui.glob = 1;
+        ui.ovl_until = 0;
+        ui.redraw = 1;
+        break;
     case M1K_PROG:                               /* back to the play page, out of the Setup page */
         ui.page = 0;
+        ui.glob = 0;
         ui.ovl_until = 0;
         ui.redraw = 1;
         break;
@@ -319,10 +381,12 @@ static void input(void)
             break;
         if ((keys & bit) && !(ui.keys & bit)) {
             uint32_t v = touch_vel(k);
-            fm1b_note(0, note, v ? v : 1u, 127u);
+            if (glob.local)
+                fm1b_note(0, transposed(note), v ? v : 1u, 127u);
             plat_midi_send(0x09u | 0x90u << 8 | note << 16 | v << 24, TO_USB);
         } else if (!(keys & bit) && (ui.keys & bit)) {
-            fm1b_note(0, note, 0, 127u);
+            if (glob.local)
+                fm1b_note(0, transposed(note), 0, 127u);
             plat_midi_send(0x08u | 0x80u << 8 | note << 16, TO_USB);
         }
     }
@@ -351,6 +415,22 @@ static void input(void)
         if ((e = plat_enc(EN_K2)) != 0 || (e = plat_enc(EN_PRESET)) != 0) {
             set.setup = m1_setup_set(set.setup, ui.field, m1_setup_get(set.setup, ui.field) + (e > 0 ? 1 : -1));
             m1_setup_apply(set.setup);
+            set_dirty = 1;                       /* saved with SAVE */
+            ui.redraw = 1;
+        }
+    } else if (ui.glob) {                        /* Global: SELECT = PAGE, K1 = the parameter, PRESET = +1 / -1 */
+        uint32_t n = m1_pg_pages ? m1_pg_count[ui.gpage] : 0u;
+        if ((e = plat_enc(EN_SELECT)) != 0 && m1_pg_pages) {
+            ui.gpage = (uint8_t)clamp((int32_t)ui.gpage + (e > 0 ? 1 : -1), 0, (int32_t)m1_pg_pages - 1);
+            ui.gsel = 0;
+            ui.redraw = 1;
+        }
+        if ((e = plat_enc(EN_K1)) != 0 && n) {
+            ui.gsel = (uint8_t)clamp((int32_t)ui.gsel + (e > 0 ? 1 : -1), 0, (int32_t)n - 1);
+            ui.redraw = 1;
+        }
+        if ((e = plat_enc(EN_PRESET)) != 0 && n && m1_pg_step(set.g, &m1_pg_par[m1_pg_first[ui.gpage] + ui.gsel], e > 0 ? 1 : -1)) {
+            globals_apply();
             set_dirty = 1;                       /* saved with SAVE */
             ui.redraw = 1;
         }
@@ -420,7 +500,7 @@ static void draw(void)
         m1_setup_draw(&st, avg);
         if (now < ui.ovl_until) {                /* a button's help over the Setup page's foot */
             cv_begin(240, 100, C_BLACK);
-            m1_lcd_draw((uint32_t)m1_setup_get(set.setup, M1_SETUP_VIEW), (uint32_t)m1_setup_get(set.setup, M1_SETUP_COLOR), ui.ovl, 4);
+            m1_lcd_draw((uint32_t)m1_setup_get(set.setup, M1_SETUP_VIEW), (uint32_t)m1_setup_get(set.setup, M1_SETUP_COLOR), ui.ovl, 4, -1);
             cv_blit(0, 140);
         }
         return;
@@ -428,13 +508,20 @@ static void draw(void)
     /* the canvas holds 240 x 144 (gfx.c APP_CANVAS_PX): two strips. The first one is the M1's LCD (m1_lcd.h), in the view and colours of the Setup page */
     {
         char row[2][40];
+        int32_t cursor = -1;
         uint32_t view = (uint32_t)m1_setup_get(set.setup, M1_SETUP_VIEW), col = (uint32_t)m1_setup_get(set.setup, M1_SETUP_COLOR);
         if (now < ui.ovl_until)
             memcpy(row, ui.ovl, sizeof row);     /* a button's help, or "not done yet", in place of the page */
+        else if (ui.glob && m1_pg_pages) {       /* a Global page; its cursor blinks */
+            cursor = m1_pg_render(ui.gpage, ui.gsel, set.g, row);
+            if ((now / 500u) & 1u)
+                cursor = -1;
+        } else if (ui.glob)
+            m1_lcd_prog_page(row, 0, 0, 0);      /* no page table in the resource: NO M1 DATA */
         else
             m1_lcd_prog_page(row, set.program, bank_ok ? st.name : 0, bank_ok);
         cv_begin(240, 140, C_BLACK);
-        m1_lcd_draw(view, col, row, view == M1_VIEW_2X20 ? 24 : 60);
+        m1_lcd_draw(view, col, row, view == M1_VIEW_2X20 ? 24 : 60, cursor);
         cv_blit(0, 0);
     }
     cv_begin(240, 100, C_BLACK);
@@ -483,6 +570,10 @@ void app_frame(void)
     ann_tick(now);
     if (ui.msg_until && now >= ui.msg_until) {
         ui.msg_until = 0;
+        ui.redraw = 1;
+    }
+    if (ui.glob && !ui.page && (uint8_t)((now / 500u) & 1u) != ui.blink) {   /* the cursor's blink */
+        ui.blink = (uint8_t)((now / 500u) & 1u);
         ui.redraw = 1;
     }
     if (ui.ovl_until && (int32_t)(now - ui.ovl_until) >= 0) {

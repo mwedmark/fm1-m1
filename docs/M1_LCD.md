@@ -100,6 +100,32 @@ from behaviour, not from a label.
 Not found: the positions in rows 0, 1, 2, 3 and 6 not listed (and bit 5 of rows 4 and 5). They do nothing in the states tried
 (no SEQ or media hardware is emulated; ENTER/EXIT may only act in a state not reached). The keyboard's own scan is not in this path.
 
+## The Global pages (measured 2026-11-27)
+
+GLOBAL (matrix 1,5) opens a list of **20 pages**, stepped with PAGE next (6,5); the OS stops at the last. A page has parameters with a **cursor**:
+the eight keys under the display (rows 2 and 6, see the map) put the cursor on the parameter whose 5-column group they stand under, and +1 / -1 (2,0 / 2,1)
+change it. The cursor's position is in `DS:94C5` (0..79); the OS shows it as a blinking underline by switching the LCD's display control between
+`0x0E` and `0x0C`. While a parameter is selected, **row 0 shows its name** on the right (`Pedal 1`, `Clock Source`, …). Values step by clamping, never wrap, on all pages
+found. A key must be held for one scan of the matrix (about 560 000 emulated instructions) and the screen read only after the LCD has been refreshed (it is written one
+character per pass of the main loop): `Machine.tap` waits.
+
+| pages | what | editable parameters |
+| --- | --- | --- |
+| 0, 1 | Master Tune (-50..+50), Key Transpose (-12..+12) | 1 each |
+| 2 | Damper switch polarity | 1 |
+| 3 | Pedal assign, two pedals (10 functions each) | 2 |
+| 4 | Scale type (5) | 1 |
+| 5 | User scale | (picture only) |
+| 6..9 | Drum kits 1..4 (instrument, key, tune, level, decay, pan; values depend on each other) | (picture only) |
+| 10 | MIDI global: channel 1..16, clock internal/external, local on/off | 3 |
+| 11 | MIDI filtering: program change, aftertouch, controllers, exclusive | 4 |
+| 12..14 | Memory protect: programs, combinations, sequences (internal, card) | 2 each |
+| 15..19 | Memory allocation, MIDI data dump, load, save, format (disk and sequencer) | (picture only) |
+
+`tools/m1_pages.py` reads all of it out of the OS (about 30 s) into a table of about 3 KB: for every page the screen as first drawn and, per parameter, the
+cursor, the label, the slot of the screen that holds its value and the list of the value texts. The firmware (`fm1base/m1_pages.h`) draws and edits from that table.
+The text is Korg's and comes from your own dump, so the table is built into your own resource region (trailer `M1PG`) and never goes into git.
+
 ## What is not done
 
 - The keys not mapped yet (see above), and the sliders and joystick (analog, 0x0900).

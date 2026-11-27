@@ -94,6 +94,12 @@ node ..\fm1-sf2\pack_bank.js roms\gen\m1_bfp8.fm1b roms\out\m1.fm1b --kbit 64 --
 python -I tools/m1_fxtable.py roms\gen\m1_patches.json roms\gen\m1_packed.fm1b roms\out\m1.fm1b
 ```
 
+```powershell
+python -I tools/m1_combi.py roms\gen\m1_patches.json roms\out\m1.fm1b
+```
+
+The last step is optional: it adds the combinations (a few KB, lower `pack_bank.js --flash` by the size it prints). Without it PLAY says `NO COMBI DATA`.
+
 `tools/fm1b_make_bank.js` is fm1-sf2's `make_bank.js` with the M1's velocity in the modulation record (44 bytes); it reads the
 converter from `../fm1-sf2/index.html` and changes it in memory, so fm1-sf2 is untouched. The engine in `engine/` reads the fields.
 
@@ -143,7 +149,7 @@ The M1's 100 factory programs as MP3 examples: https://www.synthmania.com/Korg%2
 - The factory programs exist as `.syx` (`M1 files/MPC-00/Int_M1.syx`) and are decoded by `tools/m1_syx.py` (docs/M1_ROM.md, "Program data").
   The programs are presets in the bank (docs/M1_PROGRAMS.md); times and levels are estimated and should be compared against the MP3 examples.
   `plus-1_prog_card.bin` is the Plus-1 card's own programs in the same format: the program engine can be built and tried against it.
-- The combinations (100 of them) are decoded but not used.
+- The combinations (100 of them) play (docs/M1_COMBINATIONS.md): PLAY switches PROGRAM/COMBI mode, `tools/m1_combi.py` puts the table in the bank. Not yet with their own effects or detune, and not tried against the real data or on the device. Status and next steps: [STATUS.md](STATUS.md).
 - Zone bytes 3, 6 and 7, bank 1 below 0xA3CFC and the low chips' lower nibbles (docs/M1_ROM.md, "Not finished").
 
 `src/` and `include/` are a first draft of an engine of our own from before fm1-sf2 was chosen. They are not used and should be removed.

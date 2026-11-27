@@ -36,7 +36,7 @@ measurement: envelope times, release slopes, chorus width and speed, and the lev
 
 ### Known limits
 
-- **Combinations are not made yet** (the 100 combinations of the M1's factory bank are in your bank dump and are not used). The M1's sequencer is not made either.
+- **Combinations are not in 0.1** (they come after it: docs/M1_COMBINATIONS.md). The M1's sequencer is not made either.
 - The scales for effect depth, rotary speed and the drive of distortion and overdrive are estimates: the manual does not give them. The effects' own EQ is not used.
 - Velocity does not shorten the envelope times, and the pitch EG's glide on release is not made.
 - Some samples still differ from the M1's: three notes of Organ 2, three of A.Bass and five of Pan Flute are more than 30 dB from the lossless bank's at the same note. Pan Flute's lowest zone has its root at C#5, so low notes play three octaves down; that is how the M1's table is, as far as it was read.

@@ -1,0 +1,105 @@
+# Combinations (m1_combi.c) on synthetic data: tools/tests/make_combi_host_test.sh builds the bank (fm1-sf2's default.fm1b + a synthetic combination
+# table, nothing of Korg's), then runs this in the host simulator. Programs 0..3 are what that bank has.
+# 0 Single One: program 0.  1 Layer Test: program 0 + program 1 an octave up.  2 Split Test: key <= 59 program 0, >= 60 program 1.
+# 3 VelSw Test: velocity <= 63 program 0, >= 64 program 1.  4 Multi Test: program 0 on channel 3, program 1 on channel 6.
+wait 400
+expect combi -1
+expect combi_busy 0
+
+# PLAY enters combination mode (combination 0, the number PRESET last had)
+tap PLAY
+wait 300
+expect combi 0
+expect combi_busy 0
+expect ch0_own 1
+
+# the panel's key plays the one timbre
+key 0 down 100
+wait 300
+expect ch0_voices >0
+expect ch1_voices 0
+key 0 up
+wait 800
+
+# PRESET steps to the Layer: two channels sound, the second an octave up
+turn PRESET 1
+wait 400
+expect combi 1
+key 7 down 100
+wait 300
+expect ch0_voices >0
+expect ch1_voices >0
+key 7 up
+wait 800
+
+# the Split: a low key reaches timbre 0 only, a high key (above 59) timbre 1 only. Key 0 is F3 (53), key 12 is F4 (65)
+turn PRESET 1
+wait 400
+expect combi 2
+key 0 down 100
+wait 200
+expect ch0_voices >0
+expect ch1_voices 0
+key 0 up
+wait 800
+key 12 down 100
+wait 200
+expect ch1_voices >0
+key 12 up
+wait 800
+
+# the Velocity Switch: soft on timbre 0, hard on timbre 1
+turn PRESET 1
+wait 400
+expect combi 3
+key 0 down 40
+wait 200
+expect ch0_voices >0
+expect ch1_voices 0
+key 0 up
+wait 800
+key 0 down 120
+wait 200
+expect ch1_voices >0
+key 0 up
+wait 800
+
+# Multi over MIDI: channel 3 -> timbre 0, channel 6 -> timbre 1, channel 10 is the drum kits'
+turn PRESET 1
+wait 400
+expect combi 4
+midi 92 3C 64
+wait 200
+expect ch0_voices >0
+expect ch1_voices 0
+midi 82 3C 00
+wait 800
+midi 95 3C 64
+wait 200
+expect ch1_voices >0
+midi 85 3C 00
+wait 800
+
+# a MIDI program change selects a combination
+midi C0 02
+wait 400
+expect combi 2
+
+# a note is held while the combination is changed: it ends (no stuck voice)
+midi 90 3C 64
+wait 200
+expect voices >0
+turn PRESET 1
+wait 2500
+expect voices 0
+
+# PLAY again leaves: the channels follow the panel's program again
+tap PLAY
+wait 600
+expect combi -1
+expect ch0_own 0
+key 0 down 100
+wait 300
+expect voices >0                  # (in program mode the panel plays on the engine's own channel)
+key 0 up
+wait 500

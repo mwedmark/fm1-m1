@@ -17,7 +17,7 @@ emu = ["data"]
 words = "words.tsv"
 ble = false
 cpu2 = false
-o2 = ["m1_unit.c", "m1_fx.c", "m1_fx2.c", "../engine/sf2fx.c", "../engine/sf2out.c", "../engine/live_cache/sound_cache.c", "../engine/live_cache/mp3_sound.c"]
+o2 = ["m1_unit.c", "m1_fx.c", "m1_fx2.c", "m1_combi.c", "../engine/sf2fx.c", "../engine/sf2out.c", "../engine/live_cache/sound_cache.c", "../engine/live_cache/mp3_sound.c"]
 o2_cflags = ["-DFM1_BASE=1"]
 o2_include = ["m1_cfg.h"]
 include = ["../engine", "../engine/live_cache", "../engine/third_party/mp3"]

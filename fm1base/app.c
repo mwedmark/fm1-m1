@@ -8,6 +8,7 @@
 #include "sf2fx.h"
 #include "m1_fx.h"
 #include "m1_fx2.h"
+#include "m1_combi.h"                         /* the M1's combinations: timbres on the engine's channels 0..7 */
 #include "m1_setup.h"                          /* FM-1 Setup: non-standard settings, kept apart from the M1's menus */
 
 const int16_t *m1_sea5_dqt(void);               /* m1_unit.c */
@@ -106,6 +107,15 @@ void app_panic(void)
 
 /* ------------------------------------------------------------------- MIDI --- */
 static volatile uint32_t midi_count;
+static uint8_t combi_no;                         /* the combination that PRESET / MIDI program change selected (0..99), meaningful in combination mode */
+static struct {
+    char msg[2][24];
+    uint32_t msg_until, keys, btn;
+    uint8_t redraw;
+    uint8_t page;                                /* 0 the play page, 1 FM-1 Setup (EDIT toggles) */
+    uint8_t field;                               /* the Setup page's field */
+} ui;
+
 static void midi_in(void)                        /* the main loop: everything that has come in, to the engine's queue */
 {
     uint32_t pkt;
@@ -115,6 +125,22 @@ static void midi_in(void)                        /* the main loop: everything th
         if (st >= 0xF0u || !bank_ok)
             continue;
         midi_count++;
+        if (m1_combi_active() >= 0 && ch != 9u) {   /* a combination: the timbres take the notes (channel 10 stays the drum kits') */
+            switch (st & 0xF0u) {
+            case 0x80u: m1_combi_note(ch, d1, 0); break;
+            case 0x90u: m1_combi_note(ch, d1, d2); break;
+            case 0xB0u: m1_combi_control(ch, d1, d2); break;
+            case 0xC0u:                                  /* program change selects the combination (as on the M1 in COMBI mode) */
+                if (d1 < m1_combi_count() && m1_combi_select(d1) == 0) {
+                    combi_no = (uint8_t)d1;
+                    ui.redraw = 1;
+                }
+                break;
+            case 0xE0u: m1_combi_bend(ch, d1 | d2 << 7); break;
+            default: break;
+            }
+            continue;
+        }
         switch (st & 0xF0u) {                    /* channel 10 (ch 9): the M1's drum kits in bank 128, program change selects the kit */
         case 0x80u:
             if (ch == 9u) fm1b_channel_drum_note(ch, d1, 0, 127u); else fm1b_channel_note(ch, d1, 0, 127u);
@@ -224,6 +250,7 @@ void app_init(void)
     sf2fx_set(sf2fx_reverb(), 95u);
     m1_setup_apply(set.setup);
     m1_fx2_init(p, n);                           /* the programs' effect data: the table at the end of the bank */
+    m1_combi_init(p, n);                         /* the combinations (tools/m1_combi.py): the table in front of it, or none */
     if (bank_ok && fm1b_program(0, set.program) < 0) {
         set.program = 127;
         program_select(1);
@@ -231,13 +258,6 @@ void app_init(void)
 }
 
 /* --------------------------------------------------------------------- UI --- */
-static struct {
-    char msg[2][24];
-    uint32_t msg_until, keys, btn;
-    uint8_t redraw;
-    uint8_t page;                                /* 0 the play page, 1 FM-1 Setup (EDIT toggles) */
-    uint8_t field;                               /* the Setup page's field */
-} ui;
 
 void app_say(const char *a, const char *b)
 {
@@ -261,6 +281,7 @@ static void input(void)
     if (bank_ok)
         fm1b_cache_service(FM1B_CACHE_FRAMES);   /* live cache: answer the notes' requests, decode a few MP3 frames */
     midi_in();
+    m1_combi_service();                          /* applies a combination select/leave, as the engine's queue has room */
     touch_poll();
     keys = touch_keys();
     for (k = 0; k < NKEYS && bank_ok; k++) {     /* key 0 is F3 (MIDI 53); the panel plays channel 1 */
@@ -269,10 +290,10 @@ static void input(void)
             break;
         if ((keys & bit) && !(ui.keys & bit)) {
             uint32_t v = touch_vel(k);
-            fm1b_note(0, note, v ? v : 1u, 127u);
+            if (m1_combi_active() >= 0) m1_combi_note(M1_COMBI_GLOBAL, note, v ? v : 1u); else fm1b_note(0, note, v ? v : 1u, 127u);
             plat_midi_send(0x09u | 0x90u << 8 | note << 16 | v << 24, TO_USB);
         } else if (!(keys & bit) && (ui.keys & bit)) {
-            fm1b_note(0, note, 0, 127u);
+            if (m1_combi_active() >= 0) m1_combi_note(M1_COMBI_GLOBAL, note, 0); else fm1b_note(0, note, 0, 127u);
             plat_midi_send(0x08u | 0x80u << 8 | note << 16, TO_USB);
         }
     }
@@ -288,6 +309,18 @@ static void input(void)
                 set_dirty = 1;
                 ui.redraw = 1;
             }
+        } else if (k == B_PLAY && bank_ok) {     /* PROGRAM <-> COMBINATION mode (the M1's PROG and COMBI) */
+            if (m1_combi_active() >= 0 || m1_combi_busy()) {
+                fm1b_panic();
+                m1_combi_leave();
+                app_say("PROGRAM", "");
+            } else if (m1_combi_count() && m1_combi_select(combi_no) == 0) {
+                fm1b_panic();
+                app_say("COMBI", "");
+            } else {
+                app_say("NO COMBI", "DATA");
+            }
+            ui.redraw = 1;
         } else if (k == B_EDIT) {                /* FM-1 Setup (like fm1-d50's Setup page): EDIT in and out */
             ui.page = ui.page ? 0u : 1u;
             ui.field = 0;
@@ -313,7 +346,14 @@ static void input(void)
             ui.redraw = 1;
         }
     } else if ((e = plat_enc(EN_PRESET)) != 0 && bank_ok) {
-        program_select(e > 0 ? 1 : -1);
+        if (m1_combi_active() >= 0 || m1_combi_busy()) {         /* combination mode: PRESET steps through the combinations */
+            uint32_t n = m1_combi_count();
+            uint32_t c = ((uint32_t)combi_no + (e > 0 ? 1u : n - 1u)) % n;
+            if (m1_combi_select(c) == 0)
+                combi_no = (uint8_t)c;
+        } else {
+            program_select(e > 0 ? 1 : -1);
+        }
         ui.redraw = 1;
     }
     if (keys != ui.keys || btn != ui.btn)
@@ -377,12 +417,23 @@ static void draw(void)
     if (!bank_ok) {
         cv_text(10, 100, &FONT_M, "NO M1 DATA", C_HI);
     } else {
-        t[0] = (char)('0' + (set.program + 1) / 100);
-        t[1] = (char)('0' + (set.program + 1) / 10 % 10);
-        t[2] = (char)('0' + (set.program + 1) % 10);
-        t[3] = 0;
-        cv_text(10, 60, &FONT_M, t, C_HI);
-        cv_text(10, 100, &FONT_B, st.name, C_WHITE);
+        if (m1_combi_active() >= 0 || m1_combi_busy()) {         /* combination mode: C01 and the combination's name */
+            char cn[11];
+            t[0] = 'C';
+            t[1] = (char)('0' + (combi_no + 1) / 10 % 10);
+            t[2] = (char)('0' + (combi_no + 1) % 10);
+            t[3] = 0;
+            cv_text(10, 60, &FONT_M, t, C_HI);
+            m1_combi_name(combi_no, cn);
+            cv_text(10, 100, &FONT_B, cn, C_WHITE);
+        } else {
+            t[0] = (char)('0' + (set.program + 1) / 100);
+            t[1] = (char)('0' + (set.program + 1) / 10 % 10);
+            t[2] = (char)('0' + (set.program + 1) % 10);
+            t[3] = 0;
+            cv_text(10, 60, &FONT_M, t, C_HI);
+            cv_text(10, 100, &FONT_B, st.name, C_WHITE);
+        }
     }
     cv_blit(0, 0);
     cv_begin(240, 100, C_BLACK);
@@ -441,3 +492,31 @@ void app_frame(void)
         draw();
     }
 }
+
+/* ------------------------------------------------------------- host tests --- */
+#ifdef PLAT_HOST                                 /* the simulator's checks (fm1base/tests/m1_combi.txt): not in the device build */
+int app_expect(const char *what, int *got)
+{
+    unsigned ch = 0;
+    const char *q;
+    struct fm1b_channel c;
+    if (!strcmp(what, "combi")) { *got = m1_combi_active(); return 1; }
+    if (!strcmp(what, "combi_busy")) { *got = (int)m1_combi_busy(); return 1; }
+    if (!strcmp(what, "voices")) { *got = (int)fm1b_voices_sounding(); return 1; }
+    if (what[0] != 'c' || what[1] != 'h')
+        return 0;
+    for (q = what + 2; *q >= '0' && *q <= '9'; q++)
+        ch = ch * 10u + (unsigned)(*q - '0');
+    if (q == what + 2 || ch >= FM1B_CHANNELS || *q != '_')
+        return 0;
+    fm1b_channel_info(ch, &c);
+    if (!strcmp(q, "_notes")) *got = c.notes;
+    else if (!strcmp(q, "_voices")) *got = c.voices;
+    else if (!strcmp(q, "_program")) *got = c.program;
+    else if (!strcmp(q, "_own")) *got = c.own;
+    else if (!strcmp(q, "_volume")) *got = c.volume;
+    else if (!strcmp(q, "_pan")) *got = c.pan;
+    else return 0;
+    return 1;
+}
+#endif

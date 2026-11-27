@@ -27,9 +27,11 @@ void app_backup_hold(int on);
 void app_backup_restored(void);
 
 /* measurement over USB (app.c app_sysex): F0 7D 'M' '1' 01 F7 answers F0 7D 'M' '1' 41, then 16 values of 5 x 7 bits each, F7 */
+#define APP_HOST_EXPECT                          /* host simulator checks (app.c app_expect): combi, combi_busy, voices, chN_notes/_voices/_program/_volume/_pan */
 #define APP_SYSEX
 int app_sysex(const uint8_t *p, uint32_t n);
 
+int app_expect(const char *what, int *got);   /* host simulator only */
 void app_init(void);
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12);
 void app_panic(void);

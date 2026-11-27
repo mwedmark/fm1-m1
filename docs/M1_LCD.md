@@ -39,8 +39,11 @@ Measured on the user's own OS dumps (rev 1.9, IC23 high / IC32 low) by disassemb
 
   Codes 0, 2 and 3 are never given a glyph in the start-up code (their pointers are not set there); the emulator leaves them at whatever
   RAM held, so ignore them until a page that uses them is found.
-- **The character generator ROM (CGROM) is in the LCD module, not in the OS.** The OS prints ASCII 0x20–0x7D, so the glyph shapes have
-  to come from the module's font (almost certainly the HD44780 "A00" set: the same as ASCII there except `\` and `~`). Not verifiable from the ROM.
+- **The character generator ROM (CGROM) is in the LCD module, not in the OS**, and cannot be read out through the controller's interface. The OS prints
+  ASCII 0x20–0x7D, so the glyph shapes come from the module's font. The photos show the HD44780 **ROM code A00** (Japanese standard font; ASCII except
+  `\` = yen and `~` = arrow). Its patterns are published in Table 4 of Hitachi's HD44780U datasheet (page 17), and `tools/hd44780_a00.py` reads them
+  out of the PDF (the dots are vector shapes) into `fm1base/m1_lcd.h`. Whether the M1's module has exactly ROM A00 is not proved by the ROM,
+  only by how the photos look; a clone controller's font could differ in single characters.
 
 ## Checked against photos of real displays
 
@@ -48,7 +51,7 @@ Photos of an M1 with a green module and of replacement displays (blue with white
 emulator, character for character and column for column: `PROG  I00 Init Prog` / `Battery Low (Internal)` (row 1 from column 5) and, with a
 program loaded, `PROG  I00 Universe` / `O+00 F+00 L+00 K+00 V+00 A+00 R+00 E+00`. With the battery reading faked as good the emulator draws
 that second row too (`tools/m1_lcd_emu.py`, the default; `--battery-low` leaves the warning). The photos also show the HD44780 look of the
-glyphs (a zero with a diagonal, descenders on g, j, p, q and y reaching the eighth row). The default colours in `fm1base/m1_lcd.h`
+glyphs (a zero with a diagonal, descenders on g, j, p, q and y). The default colours in `fm1base/m1_lcd.h`
 (green, blue, amber) are read off the photos.
 
 ## What the OS draws with nothing in battery RAM

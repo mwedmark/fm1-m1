@@ -15,7 +15,7 @@ Needs: pip install unicorn
 import argparse, ctypes, json, sys
 
 try:
-    from unicorn import (Uc, UcError, UC_ARCH_X86, UC_MODE_16, UC_PROT_ALL, UC_HOOK_INSN, UC_HOOK_INSN_INVALID)
+    from unicorn import (Uc, UcError, UC_ARCH_X86, UC_MODE_16, UC_PROT_ALL, UC_HOOK_CODE, UC_HOOK_INSN, UC_HOOK_INSN_INVALID)
     from unicorn.x86_const import *
 except ImportError:
     sys.exit("needs the unicorn package: pip install unicorn")
@@ -23,6 +23,7 @@ except ImportError:
 DS = 0xF75C                      # the OS's data segment: 0xF75C0 + offset wraps at 1 MB onto the low RAM (A20 wrap)
 LCD_DATA, LCD_CTL = 0xA06, 0xA08  # HD44780-compatible: control bit 0 = RS, bit 1 = R/W, bit 2 = E
 TICK_ISR, SND_ISR = 0x11E8D, 0x11F40   # image offsets of the two interrupt handlers
+BATTERY_CHECK = 0x1EF6                 # image offset of the start-up compare of the battery reading (RAM DS:C4E1, ok = 0x81..0xCD)
 
 
 def phys(seg, off):
@@ -146,6 +147,13 @@ class Machine:
         self.v20_ops += 1
         return True
 
+    def battery_ok(self):
+        """The OS reads the battery from hardware that is not emulated and would show `Battery Low` on the play page: give it a good reading."""
+        def fix(uc, addr, size, ud):
+            uc.mem_write(phys(DS, 0xC4E1), b'\xA0')
+        a = 0x100000 - len(self.image) + BATTERY_CHECK
+        self.mu.hook_add(UC_HOOK_CODE, fix, None, a, a)
+
     def vector_for(self, image_off):
         for v in range(256):
             w = bytes(self.mu.mem_read(v * 4, 4))
@@ -189,12 +197,15 @@ def main():
     ap.add_argument('ic23')
     ap.add_argument('ic32')
     ap.add_argument('--instr', type=int, default=300_000_000, help='instructions to run (the play page needs ~300 M)')
+    ap.add_argument('--battery-low', action='store_true', help='leave the battery reading at 0: the play page shows Battery Low')
     ap.add_argument('--json', help='write the rows and the custom characters here')
     a = ap.parse_args()
     ic23, ic32 = open(a.ic23, 'rb').read(), open(a.ic32, 'rb').read()
     if len(ic23) != len(ic32) or len(ic23) != 65536:
         sys.exit('IC23 and IC32 must both be 65536 bytes')
     m = Machine(ic23, ic32)
+    if not a.battery_low:
+        m.battery_ok()
     try:
         m.run(a.instr)
     except UcError as e:

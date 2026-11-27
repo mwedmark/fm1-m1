@@ -42,6 +42,15 @@ Measured on the user's own OS dumps (rev 1.9, IC23 high / IC32 low) by disassemb
 - **The character generator ROM (CGROM) is in the LCD module, not in the OS.** The OS prints ASCII 0x20–0x7D, so the glyph shapes have
   to come from the module's font (almost certainly the HD44780 "A00" set: the same as ASCII there except `\` and `~`). Not verifiable from the ROM.
 
+## Checked against photos of real displays
+
+Photos of an M1 with a green module and of replacement displays (blue with white dots, black with amber dots) show the same text as the
+emulator, character for character and column for column: `PROG  I00 Init Prog` / `Battery Low (Internal)` (row 1 from column 5) and, with a
+program loaded, `PROG  I00 Universe` / `O+00 F+00 L+00 K+00 V+00 A+00 R+00 E+00`. With the battery reading faked as good the emulator draws
+that second row too (`tools/m1_lcd_emu.py`, the default; `--battery-low` leaves the warning). The photos also show the HD44780 look of the
+glyphs (a zero with a diagonal, descenders on g, j, p, q and y reaching the eighth row). The default colours in `fm1base/m1_lcd.h`
+(green, blue, amber) are read off the photos.
+
 ## What the OS draws with nothing in battery RAM
 
 `tools/m1_lcd_emu.py` boots the OS to the play page: row 0 the program number and name (`PROG  I00 Init Prog`), row 1 the

@@ -9,6 +9,7 @@
 #include "m1_fx.h"
 #include "m1_fx2.h"
 #include "m1_setup.h"                          /* FM-1 Setup: non-standard settings, kept apart from the M1's menus */
+#include "m1_lcd.h"                            /* the M1's 40 x 2 LCD: two views, three colour schemes */
 
 const int16_t *m1_sea5_dqt(void);               /* m1_unit.c */
 
@@ -330,7 +331,7 @@ void app_input_only(void) { input(); }
 static void m1_setup_draw(const struct fm1b_status *st, unsigned avg)
 {
     char t[24];
-    uint32_t i, v;
+    uint32_t i, v, k;
     (void)st;
     cv_begin(240, 140, C_BLACK);
     cv_text(10, 6, &FONT_B, "FM-1 SETUP", C_WHITE);
@@ -342,9 +343,16 @@ static void m1_setup_draw(const struct fm1b_status *st, unsigned avg)
         t[k] = 0;
         cv_text(10, 50 + 30 * i, &FONT_M, t, i == ui.field ? C_HI : C_WHITE);
         v = (uint32_t)m1_setup_get(set.setup, i);
-        t[0] = (char)('0' + v / 10 % 10);
-        t[1] = (char)('0' + v % 10);
-        t[2] = 0;
+        if (i == M1_SETUP_VIEW || i == M1_SETUP_COLOR) {          /* by name */
+            const char *vn = i == M1_SETUP_VIEW ? m1_view_names[v] : m1_lcd_pals[v].name;
+            for (k = 0; vn[k] && k < 6u; k++)
+                t[k] = vn[k];
+            t[k] = 0;
+        } else {
+            t[0] = (char)('0' + v / 10 % 10);
+            t[1] = (char)('0' + v % 10);
+            t[2] = 0;
+        }
         cv_text(150, 50 + 30 * i, &FONT_M, t, i == ui.field ? C_HI : C_WHITE);
     }
     cv_blit(0, 0);
@@ -371,20 +379,15 @@ static void draw(void)
         m1_setup_draw(&st, avg);
         return;
     }
-    /* the canvas holds 240 x 144 (gfx.c APP_CANVAS_PX): two strips */
-    cv_begin(240, 140, C_BLACK);
-    cv_text(10, 6, &FONT_B, APP_NAME, C_WHITE);
-    if (!bank_ok) {
-        cv_text(10, 100, &FONT_M, "NO M1 DATA", C_HI);
-    } else {
-        t[0] = (char)('0' + (set.program + 1) / 100);
-        t[1] = (char)('0' + (set.program + 1) / 10 % 10);
-        t[2] = (char)('0' + (set.program + 1) % 10);
-        t[3] = 0;
-        cv_text(10, 60, &FONT_M, t, C_HI);
-        cv_text(10, 100, &FONT_B, st.name, C_WHITE);
+    /* the canvas holds 240 x 144 (gfx.c APP_CANVAS_PX): two strips. The first one is the M1's LCD (m1_lcd.h), in the view and colours of the Setup page */
+    {
+        char row[2][40];
+        uint32_t view = (uint32_t)m1_setup_get(set.setup, M1_SETUP_VIEW), col = (uint32_t)m1_setup_get(set.setup, M1_SETUP_COLOR);
+        m1_lcd_prog_page(row, set.program, bank_ok ? st.name : 0, bank_ok);
+        cv_begin(240, 140, C_BLACK);
+        m1_lcd_draw(view, col, row, view == M1_VIEW_2X20 ? 24 : 60);
+        cv_blit(0, 0);
     }
-    cv_blit(0, 0);
     cv_begin(240, 100, C_BLACK);
     if (now < ui.msg_until) {
         cv_text(10, 20, &FONT_B, ui.msg[0], C_WHITE);

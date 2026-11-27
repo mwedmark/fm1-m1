@@ -60,9 +60,48 @@ glyphs (a zero with a diagonal, descenders on g, j, p, q and y). The default col
 battery warning from column 5. The start splash is on row 1 from column 5, with the version at column 35. Programs, combinations and
 global data live in battery RAM, which the emulator does not have; to see a real program name, the RAM has to be loaded (next step).
 
+## The panel scan (measured 2026-11-27)
+
+- **Where:** the tick interrupt (vector 10, OS 0x11E8D) calls the scanner at OS **0x11BAC** every time, and every fourth call (a counter in
+  `DS:C4D4` overflowing) the panel scan at **0x11C22**.
+- **Key matrix:** 7 rows. The scanner writes the row number to I/O **0x0A00** (bits 0..2; the upper bits are other outputs, written in the same byte) and
+  reads the columns from **0x0A02**, **bits 0..5**: 1 = key down. A read is done twice and must agree (debounce). The previous row values are kept at
+  `DS:C4CC` + row; a changed bit makes an event in a ring of 64 bytes at `DS:C486` (write index `DS:C4CA`, count `DS:C4C6`): code **row × 8 + column**,
+  with bit 7 set for a key going down (the repeat table at `DS:9543` decides which keys repeat). The main loop takes the events (OS 0x8D6).
+- Bits 6 and 7 of 0x0A02 are other inputs, not keys: bit 6 is debounced for 20 scans and queues event 0xFD when low / 0xFB when high (not identified);
+  0x0A08 bit 3 queues 0xFC (not identified). The emulator leaves them 0, which the OS accepts.
+- **Analog inputs:** 8 channels are read from **0x0900** after selecting one with 0x0A00 (bits 3..5 and the strobe bit 6/7), compared with the last
+  value (change of 2 or more counts) and flagged in `DS:C4EB` (sliders, joystick, pedals: not used in the emulator, all read 0).
+- **Other outputs of the scan loop:** 0x0A04 (three values in turn, with bits from `DS:9556`: the LED columns).
+
+### The key map (what each position does in the emulator)
+
+Found by pressing every position from the play page, from Combination, from Program edit and from Global and watching the LCD
+(`tools/m1_lcd_emu.py --tap ROW,COL`). Most functions act on the **release**. The names are what the function is on an M1; they are inferred
+from behaviour, not from a label.
+
+| row, col | function | evidence |
+| --- | --- | --- |
+| 0,4 | COMBI (play) | `COMBI I00 Init Combi` / bank grid |
+| 0,5 | COMBI edit | `COMBINATION TYPE ( MULTI )` |
+| 1,2 | PROG (play) | `PROG I00 Init Prog` / `O+00 F+00 …` |
+| 1,3 | PROG edit | `OSC BASIC  OSC Mode` |
+| 1,5 | GLOBAL | `Master Tune = +00` |
+| 2,0 | +1 / YES | next program, `Master Tune = +01`, `OSC Mode (DOUBLE)` |
+| 2,1 | −1 / NO | `Master Tune = -01` |
+| 2,2 .. 2,5 | O F L K in Program play (`OSC Balance`, `VDF Cutoff`, `VDA Level`, `VDFA KBD Track`); timbres 1..4 in Combination | letters of the second row |
+| 6,0 .. 6,3 | V A R E in Program play (`Vel. Sens`, `Attack Time`, `Release Time`, `Effect Balance`); timbres 5..8 in Combination | the same |
+| 6,5 | PAGE next | `OSC1 Multisound`, `Key Transpose`, `Timbre 1 Level` |
+| 6,4 | PAGE previous | back from the second Program-edit page |
+| 4,0 .. 4,4 | digits 0..4 | `PROG I0*` … `I4*` |
+| 5,0 .. 5,4 | digits 5..9 | `PROG I5*` … `I9*` |
+| 3,1 | back / exit (to the first Program-edit page) | seen on page 2 only |
+
+Not found: the positions in rows 0, 1, 2, 3 and 6 not listed (and bit 5 of rows 4 and 5). They do nothing in the states tried
+(no SEQ or media hardware is emulated; ENTER/EXIT may only act in a state not reached). The keyboard's own scan is not in this path.
+
 ## What is not done
 
-- Key input (to reach Combination, Edit, Global, Disk pages): the panel's scan hardware is not found yet (the tick interrupt, OS 0x11E8D, calls
-  the scanner at 0x1BAC; port 0xA02 bit 7 is read in 0x11E51).
+- The keys not mapped yet (see above), and the sliders and joystick (analog, 0x0900).
 - Loading the factory programs into RAM, to draw real names and values.
 - The sound chips' ports (0x500–0x50E, 0x200–0x24E …) are only written to, never answered: enough for the display, not for a full boot.

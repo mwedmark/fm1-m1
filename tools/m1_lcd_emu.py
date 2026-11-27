@@ -23,6 +23,7 @@ except ImportError:
 DS = 0xF75C                      # the OS's data segment: 0xF75C0 + offset wraps at 1 MB onto the low RAM (A20 wrap)
 LCD_DATA, LCD_CTL = 0xA06, 0xA08  # HD44780-compatible: control bit 0 = RS, bit 1 = R/W, bit 2 = E
 TICK_ISR, SND_ISR = 0x11E8D, 0x11F40   # image offsets of the two interrupt handlers
+PORT_ROW, PORT_KEYS = 0xA00, 0xA02    # the panel matrix: row select (bits 0..2), the columns read back (bits 0..5)
 BATTERY_CHECK = 0x1EF6                 # image offset of the start-up compare of the battery reading (RAM DS:C4E1, ok = 0x81..0xCD)
 
 
@@ -82,10 +83,16 @@ class Machine:
         mu.mem_write(0x100000 - len(img), self.image)
         mu.reg_write(UC_X86_REG_CS, 0xF000)
         mu.reg_write(UC_X86_REG_IP, 0xFFF0)
-        self.lcd, self.ports, self.v20_ops, self.ticks = Lcd(), {}, 0, 0
-        mu.hook_add(UC_HOOK_INSN, lambda uc, port, size, ud: 0, None, 1, 0, UC_X86_INS_IN)
+        self.lcd, self.ports, self.v20_ops, self.ticks, self.vt, self.started = Lcd(), {}, 0, 0, None, False
+        self.keys = [0] * 8                         # the panel matrix: bit c of keys[r] set = the key on row r, column c is down
+        mu.hook_add(UC_HOOK_INSN, self._in, None, 1, 0, UC_X86_INS_IN)
         mu.hook_add(UC_HOOK_INSN, self._out, None, 1, 0, UC_X86_INS_OUT)
         mu.hook_add(UC_HOOK_INSN_INVALID, self._v20)
+
+    def _in(self, uc, port, size, ud):
+        if port == PORT_KEYS:                        # the scanner wrote the row number to PORT_ROW (bits 0..2) just before
+            return self.keys[self.ports.get(PORT_ROW, 0) & 7]
+        return 0
 
     def _out(self, uc, port, size, val, ud):
         self.ports[port] = val
@@ -154,6 +161,27 @@ class Machine:
         a = 0x100000 - len(self.image) + BATTERY_CHECK
         self.mu.hook_add(UC_HOOK_CODE, fix, None, a, a)
 
+    def snapshot(self):
+        mu = self.mu
+        regs = [r for r in (UC_X86_REG_AX, UC_X86_REG_BX, UC_X86_REG_CX, UC_X86_REG_DX, UC_X86_REG_SI, UC_X86_REG_DI, UC_X86_REG_BP,
+                            UC_X86_REG_SP, UC_X86_REG_CS, UC_X86_REG_DS, UC_X86_REG_ES, UC_X86_REG_SS, UC_X86_REG_IP, UC_X86_REG_EFLAGS)]
+        return ([mu.reg_read(r) for r in regs], regs, bytes(mu.mem_read(0, 0xE0000)), list(self.lcd.dd), list(self.lcd.cg),
+                self.lcd.pos, self.lcd.cgram, dict(self.ports), list(self.keys), self.vt)
+
+    def restore(self, snap):
+        vals, regs, mem, dd, cg, pos, cgram, ports, keys, vt = snap
+        self.mu.mem_write(0, mem)
+        for r, v in zip(regs, vals):
+            self.mu.reg_write(r, v)
+        self.lcd.dd, self.lcd.cg, self.lcd.pos, self.lcd.cgram = list(dd), list(cg), pos, cgram
+        self.ports, self.keys, self.vt = dict(ports), list(keys), vt
+
+    def press(self, row, col, down=True):
+        if down:
+            self.keys[row] |= 1 << col
+        else:
+            self.keys[row] &= ~(1 << col)
+
     def vector_for(self, image_off):
         for v in range(256):
             w = bytes(self.mu.mem_read(v * 4, 4))
@@ -175,16 +203,16 @@ class Machine:
         mu.reg_write(UC_X86_REG_IP, int.from_bytes(w[:2], 'little'))
 
     def run(self, instructions, chunk=20000):
-        mu, done, first, vt = self.mu, 0, True, None
+        mu, done = self.mu, 0
         while done < instructions:
-            start = 0xFFFF0 if first else phys(mu.reg_read(UC_X86_REG_CS), mu.reg_read(UC_X86_REG_IP))
-            first = False
+            start = 0xFFFF0 if not self.started else phys(mu.reg_read(UC_X86_REG_CS), mu.reg_read(UC_X86_REG_IP))
+            self.started = True
             mu.emu_start(start, 0xFFFFFFFF, count=chunk)
             done += chunk
-            if vt is None:
-                vt = self.vector_for(TICK_ISR)
-            if vt is not None and mu.reg_read(UC_X86_REG_EFLAGS) & 0x200:
-                self.interrupt(vt)
+            if self.vt is None:
+                self.vt = self.vector_for(TICK_ISR)
+            if self.vt is not None and mu.reg_read(UC_X86_REG_EFLAGS) & 0x200:
+                self.interrupt(self.vt)
                 self.ticks += 1
 
 
@@ -198,6 +226,8 @@ def main():
     ap.add_argument('ic32')
     ap.add_argument('--instr', type=int, default=300_000_000, help='instructions to run (the play page needs ~300 M)')
     ap.add_argument('--battery-low', action='store_true', help='leave the battery reading at 0: the play page shows Battery Low')
+    ap.add_argument('--tap', action='append', default=[], metavar='ROW,COL',
+                    help='after the boot, press and release the key on that row (0..6) and column (0..5); repeatable, in order (docs/M1_LCD.md has the map)')
     ap.add_argument('--json', help='write the rows and the custom characters here')
     a = ap.parse_args()
     ic23, ic32 = open(a.ic23, 'rb').read(), open(a.ic32, 'rb').read()
@@ -210,6 +240,12 @@ def main():
         m.run(a.instr)
     except UcError as e:
         print('emulation stopped:', e, file=sys.stderr)
+    for k in a.tap:
+        row, col = (int(v) for v in k.split(','))
+        m.press(row, col)
+        m.run(4_000_000)                            # most functions act on the release, a few on the press
+        m.press(row, col, False)
+        m.run(4_000_000)
     print('ticks %d, V20 bit instructions %d' % (m.ticks, m.v20_ops))
     for r in m.lcd.rows():
         print('|' + show(r) + '|')

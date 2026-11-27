@@ -68,6 +68,13 @@ the loop seams against the PCM and can write each multisound and drum sound as a
 python -I tools/m1_os.py "M1 files\rev19-ic23-880219.bin" "M1 files\rev19-ic32-880319.bin" --pcm roms\gen\m1_pcm.bin --out roms\gen\m1_tables.json --wav roms\gen\ms
 ```
 
+`tools/m1_lcd_emu.py`: runs the OS EPROMs (an NEC V50, so x86 plus the V20 bit instructions) in Unicorn and reads out what the OS writes to the 40 × 2 LCD,
+to build the M1's exact screens from (docs/M1_LCD.md). Needs `pip install unicorn`:
+
+```powershell
+python -I tools/m1_lcd_emu.py "M1 files\rev19-ic23-880219.bin" "M1 files\rev19-ic32-880319.bin" --json roms\gen\lcd.json
+```
+
 ## From dump to bank (live cache)
 
 The bank is a packed FM1B (fm1-sf2's live cache): most sounds as an MP3 stream at 64 kbit/s in flash, decoded into a cache

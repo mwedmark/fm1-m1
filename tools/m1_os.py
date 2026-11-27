@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
-"""Läser multisound-, sampel- och trumtabellerna ur användarens egen Korg M1 OS-EPROM (IC23 hög + IC32 låg, 2 x 64 KB)
-och skriver dem som JSON. Innehåller ingen Korg-data; formatet är uppmätt på OS v1.9 (rev19), se docs/M1_ROM.md.
+"""Reads the multisound, sample and drum tables from the user's own Korg M1 OS EPROM (IC23 high + IC32 low, 2 x 64 KB)
+and writes them as JSON. Contains no Korg data; the format was measured on OS v1.9 (rev19), see docs/M1_ROM.md.
 
   python -I tools/m1_os.py "M1 files/rev19-ic23-880219.bin" "M1 files/rev19-ic32-880319.bin" --pcm roms/gen/m1_pcm.bin \
       --out roms/gen/m1_tables.json [--wav roms/gen/ms]
 
---pcm kontrollerar loopskarvarna mot PCM:en (tools/m1_rom.py --out); --wav skriver varje multisounds zoner och varje trumljud
-som WAV (31 250 Hz) för att lyssna på.
+--pcm checks the loop seams against the PCM (tools/m1_rom.py --out); --wav writes each multisound's zones and each drum sound
+as WAV (31 250 Hz) to listen to.
 """
 import argparse, array, json, os, statistics, struct, sys, wave
 
 PCM_RATE = 31250
-NAME_TABLE_PROBE = b"Piano     "   # första multisoundens namn: tabellen hittas på det, inte på en fast adress
-DWGS_BLOCK = 0x3FC                 # en DWGS-våg: cykler på 512, 256 ... 4 sampel (summa 1020)
+NAME_TABLE_PROBE = b"Piano     "   # the first multisound's name: the table is found by it, not at a fixed address
+DWGS_BLOCK = 0x3FC                 # one DWGS wave: cycles of 512, 256 ... 4 samples (sum 1020)
 
 
 def load_os(hi_path, lo_path):
     hi, lo = open(hi_path, "rb").read(), open(lo_path, "rb").read()
     if len(hi) != len(lo):
-        sys.exit("IC23 och IC32 har olika storlek")
+        sys.exit("IC23 and IC32 differ in size")
     img = bytearray(2 * len(hi))
     img[0::2] = lo
     img[1::2] = hi
@@ -28,8 +28,8 @@ def load_os(hi_path, lo_path):
 def parse(img):
     probe = img.find(NAME_TABLE_PROBE)
     if probe < 4:
-        sys.exit("hittar inte multisound-namnen (är det en M1 OS-dump, hög och låg i rätt ordning?)")
-    names_at = probe - 4                         # post: u16 zonpekare, u8 typ (2 = DWGS), u8 antal zoner, char[10] namn
+        sys.exit("cannot find the multisound names (is it an M1 OS dump, high and low in the right order?)")
+    names_at = probe - 4                         # record: u16 zone pointer, u8 type (2 = DWGS), u8 number of zones, char[10] name
     ms = []
     for n in range(100):
         o = names_at + 14 * n
@@ -38,9 +38,9 @@ def parse(img):
                    "dwgs": kind == 2, "nzones": nz})
     zone_lo = min(m["zone_ptr"] for m in ms)
     zone_hi = max(m["zone_ptr"] + 10 * m["nzones"] for m in ms)
-    seg = names_at - zone_hi                     # zontabellen slutar där namntabellen börjar
+    seg = names_at - zone_hi                     # the zone table ends where the name table begins
     if seg < 0:
-        sys.exit("zontabellens segment stämmer inte")
+        sys.exit("the zone table's segment does not add up")
 
     zones = {}
     for p in range(zone_lo, zone_hi, 10):
@@ -48,15 +48,15 @@ def parse(img):
         zones[p] = {"sample_ptr": sp, "top_key": top, "b3": b3, "fine": fine, "root_key": root, "b6": b6, "b7": b7}
     sample_lo = min(z["sample_ptr"] for z in zones.values())
 
-    # trumljudens namn (char[10] + 1) och, före dem, deras pekare i samma segment
+    # the drum sounds' names (char[10] + 1) and, before them, their pointers in the same segment
     first_drum_name = seg + struct.unpack_from("<H", img, names_at + 14 * 100)[0]
     drums = []
     for n in range(44):
         o = first_drum_name + 11 * n
         drums.append({"index": n, "name": img[o:o + 10].decode("ascii").rstrip()})
 
-    # sampelposterna: från den första zonen pekar på, upp till zontabellen; 14 byte: u16 0, u32 start, u32 loop | 1<<26 (loop),
-    # u32 slut | bank<<20. PCM:en är en följd över båda bankerna: Strings zon 3 och framåt ligger i bank 1, trummorna sist där.
+    # the sample records: from the first one a zone points to, up to the zone table; 14 bytes: u16 0, u32 start, u32 loop | 1<<26 (loop),
+    # u32 end | bank<<20. The PCM is one sequence across both banks: Strings zone 3 onwards is in bank 1, the drums last there.
     samples = []
     by_ptr = {}
     for p in range(sample_lo, zone_lo, 14):
@@ -74,11 +74,11 @@ def parse(img):
             m["zones"].append(z)
         del m["zone_ptr"]
     dwgs = [m for m in ms if m["dwgs"]]
-    for k, m in enumerate(dwgs):                 # DWGS-våg k: blocket k * 0x3FC, zonernas poster är platser inom blocket
+    for k, m in enumerate(dwgs):                 # DWGS wave k: the block k * 0x3FC, the zones' records are positions within the block
         m["dwgs_wave"] = k
         m["dwgs_base"] = k * DWGS_BLOCK
 
-    # trumljuden: de 44 sampelposter i följd som ingen zon använder och som går i en kedja (slut + 2 = nästa start)
+    # the drum sounds: the 44 consecutive sample records that no zone uses and that form a chain (end + 2 = next start)
     used = {z["sample"] for m in ms for z in m["zones"]}
     free = [i for i in range(len(samples)) if i not in used]
     run = []
@@ -119,7 +119,7 @@ def render(tab, pcm, folder):
     gap = array.array("h", bytes(2 * (PCM_RATE // 4)))
     def one(s, base=0):
         out = array.array("h", pcm[base + s["start"]:base + s["end"]])
-        if s["loop"]:                            # loopen ett par gånger, upp till en sekund
+        if s["loop"]:                            # the loop a couple of times, up to one second
             l, e = base + s["loop_start"], base + s["end"]
             while len(out) < PCM_RATE and e > l:
                 out += pcm[l:e]
@@ -146,23 +146,23 @@ def main():
     a = ap.parse_args()
     tab = parse(load_os(a.ic23_hi, a.ic32_lo))
     ms, dr, sa = tab["multisounds"], tab["drums"], tab["samples"]
-    print(f"{len(ms)} multisounds ({sum(m['dwgs'] for m in ms)} DWGS), {sum(len(m['zones']) for m in ms)} zoner, "
-          f"{len(sa)} sampelposter, {len(dr)} trumljud ({sum('sample' in d for d in dr)} med sampel)")
+    print(f"{len(ms)} multisounds ({sum(m['dwgs'] for m in ms)} DWGS), {sum(len(m['zones']) for m in ms)} zones, "
+          f"{len(sa)} sample records, {len(dr)} drum sounds ({sum('sample' in d for d in dr)} with a sample)")
     top = max(s["end"] for s in sa)
-    print(f"högsta PCM-adress {top:#x} (av 0x200000 i dumpen)")
+    print(f"highest PCM address {top:#x} (of 0x200000 in the dump)")
     if a.pcm:
         pcm = array.array("h")
         pcm.frombytes(open(a.pcm, "rb").read())
         seams = check(tab, pcm)
-        print(f"loopskarvar: {len(seams)}, median {statistics.median(seams):.2f} av ett normalsteg "
-              f"(rätt tolkning: under ~0.5; fel: ~2-3)")
+        print(f"loop seams: {len(seams)}, median {statistics.median(seams):.2f} of a normal step "
+              f"(correct reading: under ~0.5; wrong: ~2-3)")
         if a.wav:
             render(tab, pcm, a.wav)
-            print(f"WAV-filer i {a.wav}")
+            print(f"WAV files in {a.wav}")
     if a.out:
         with open(a.out, "w", encoding="utf-8") as f:
             json.dump(tab, f, indent=1, ensure_ascii=False)
-        print(f"skrev {a.out}")
+        print(f"wrote {a.out}")
 
 
 if __name__ == "__main__":

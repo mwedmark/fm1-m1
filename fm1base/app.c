@@ -1,38 +1,38 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* M1 på fm1-base, första steget: fm1-sf2:s sampelmotor (engine/, m1_unit.c) spelar banken i resursregionen från
- * tangenterna och MIDI. Allt som skriver till motorns kö (fm1b_*) görs från huvudloopen, som fm1b.h kräver (en skrivare);
- * ljudavbrottet bara renderar. Del av plattformens unity-build: gfx.c och announce.c finns i scope. */
-#include "m1_cfg.h"                             /* före fm1b.h: live cache (FM1B_PACKED) */
+/* M1 on fm1-base, the first step: fm1-sf2's sample engine (engine/, m1_unit.c) plays the bank in the resource region from
+ * the keys and MIDI. Everything that writes to the engine's queue (fm1b_*) is done from the main loop, as fm1b.h requires (one writer);
+ * the audio interrupt only renders. Part of the platform's unity build: gfx.c and announce.c are in scope. */
+#include "m1_cfg.h"                             /* before fm1b.h: live cache (FM1B_PACKED) */
 #include "fm1b.h"
 #include "sf2out.h"
 #include "sf2fx.h"
 #include "m1_fx.h"
 #include "m1_fx2.h"
-#include "m1_setup.h"                          /* FM-1 Setup: icke-standardinställningar, skilda från M1:s menyer */
+#include "m1_setup.h"                          /* FM-1 Setup: non-standard settings, kept apart from the M1's menus */
 
 const int16_t *m1_sea5_dqt(void);               /* m1_unit.c */
 
 #if APP_BLOCK != 128u
-#error "APP_BLOCK måste vara FM1_BLOCK_FRAMES (engine/engine.h)"
+#error "APP_BLOCK must be FM1_BLOCK_FRAMES (engine/engine.h)"
 #endif
 
 #define SET_MAGIC 0x3153314Du                    /* "M1S1" */
 typedef struct {
     uint32_t magic;
-    int8_t octave;                               /* -3 .. +3: Kick 1 i M1:s kittar ligger på tangent 24 */
+    int8_t octave;                               /* -3 .. +3: Kick 1 in the M1's kits is on key 24 */
     uint8_t program;                             /* 0..127 */
-    uint8_t setup;                               /* FM-1 Setup (m1_setup.h): röstgränsen; 0 i en äldre post = standard */
+    uint8_t setup;                               /* FM-1 Setup (m1_setup.h): the voice limit; 0 in an older record = default */
     uint8_t rsv;
 } settings_t;
 static settings_t set;
 static uint8_t set_dirty, bank_ok;
 
-/* live cache: MP3-ljuden avkodas hit (BFP8) när en not behöver dem. fm1-base:s pool (gfx.c och andra tar resten) */
+/* live cache: the MP3 sounds are decoded here (BFP8) when a note needs them. fm1-base's pool (gfx.c and others take the rest) */
 static uint8_t cache_pool[FM1B_CACHE_KB * 1024u] __attribute__((aligned(4), section(".pool")));
 
 /* ------------------------------------------------------------------- data --- */
-/* banken: resursregionens innehåll. På enheten ger plat_res den; i webbemulatorn läses regionen som den ligger (commit-posten
- * "RES1", längd och CRC-32), som i fm1-d50 app.c app_d50_data */
+/* the bank: the resource region's contents. On the device plat_res provides it; in the web emulator the region is read as it lies (the commit record
+ * "RES1", length and CRC-32), as in fm1-d50 app.c app_d50_data */
 static uint32_t crc32_add(uint32_t c, const void *p, uint32_t n)
 {
     const uint8_t *b = (const uint8_t *)p;
@@ -72,7 +72,7 @@ static const uint8_t *bank_data(uint32_t *len)
     *len = 0;
     return 0;
 }
-static uint32_t res_stamp(void)                  /* commit-postens CRC: ändras när ny data skrivits över USB */
+static uint32_t res_stamp(void)                  /* the commit record's CRC: changes when new data has been written over USB */
 {
     uint32_t crc = 0;
     const uint8_t *r = plat_data(APP_RES_BASE);
@@ -90,7 +90,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     if (!bank_ok)
         return;
     sf2out_render(lr);
-    m1_fx_render(lr, n);                         /* programmets delay på hela utgången */
+    m1_fx_render(lr, n);                         /* the program's delay on the whole output */
     m1_fx2_render(lr, n);                        /* tremolo, overdrive, distortion, exciter, symphonic, flanger, rotary */
     m1_limit_post(lr, n);
     for (i = 0; i < 2u * n; i++)                 /* MASTER (0..4096) */
@@ -106,7 +106,7 @@ void app_panic(void)
 
 /* ------------------------------------------------------------------- MIDI --- */
 static volatile uint32_t midi_count;
-static void midi_in(void)                        /* huvudloopen: allt som kommit in, till motorns kö */
+static void midi_in(void)                        /* the main loop: everything that has come in, to the engine's queue */
 {
     uint32_t pkt;
     int port;
@@ -115,7 +115,7 @@ static void midi_in(void)                        /* huvudloopen: allt som kommit
         if (st >= 0xF0u || !bank_ok)
             continue;
         midi_count++;
-        switch (st & 0xF0u) {                    /* kanal 10 (ch 9): M1:s trumkittar i bank 128, programbyte väljer kitt */
+        switch (st & 0xF0u) {                    /* channel 10 (ch 9): the M1's drum kits in bank 128, program change selects the kit */
         case 0x80u:
             if (ch == 9u) fm1b_channel_drum_note(ch, d1, 0, 127u); else fm1b_channel_note(ch, d1, 0, 127u);
             break;
@@ -130,10 +130,10 @@ static void midi_in(void)                        /* huvudloopen: allt som kommit
     }
 }
 
-/* ------------------------------------------------------------ mätning --- */
-/* F0 7D 'M' '1' 01 F7: CPU (sf2out_cpu: medel och topp sedan förra frågan; plat_cpu_pct nu), missade ljudblock (plat_xruns),
- * röster (nu, gräns, kapade), CPU-vaktens kapningar och live cachens räknare (fm1b_cache_stats). Värdena räknar från start
- * (utom CPU-toppen): den som frågar tar skillnaden. tools/m1_measure.py läser dem. */
+/* ------------------------------------------------------------ measurement --- */
+/* F0 7D 'M' '1' 01 F7: CPU (sf2out_cpu: average and peak since the previous query; plat_cpu_pct now), missed audio blocks (plat_xruns),
+ * voices (now, limit, cut), the CPU guard's cuts and the live cache's counters (fm1b_cache_stats). The values count from start
+ * (except the CPU peak): whoever asks takes the difference. tools/m1_measure.py reads them. */
 int app_sysex(const uint8_t *p, uint32_t n)
 {
     uint8_t r[5 + 16 * 5 + 1] = {0xF0, 0x7D, 'M', '1', 0x41}, *d = r + 5;
@@ -192,7 +192,7 @@ void app_backup_flush(void) {}
 void app_backup_hold(int on) { (void)on; }
 void app_backup_restored(void) { settings_load(); }
 
-static void program_select(int32_t step)         /* nästa program som banken har, åt det hållet */
+static void program_select(int32_t step)         /* the next program that the bank has, in that direction */
 {
     int32_t p = set.program, k;
     for (k = 0; k < 128; k++) {
@@ -213,17 +213,17 @@ void app_init(void)
     const uint8_t *p = bank_data(&n);
     settings_load();
     fm1b_cache_attach(cache_pool, sizeof cache_pool);
-    /* bankens längd står i dess header (offset 40); resursen kan ha effekttabellen efter den (tools/m1_fxtable.py) */
+    /* the bank's length is in its header (offset 40); the resource may have the effect table after it (tools/m1_fxtable.py) */
     bank_len = p && n >= 48u && p[0] == 'F' && p[1] == 'M' && p[2] == '1' && p[3] == 'B' ?
                (uint32_t)p[40] | (uint32_t)p[41] << 8 | (uint32_t)p[42] << 16 | (uint32_t)p[43] << 24 : n;
     if (bank_len > n)
         bank_len = n;
     bank_ok = p && fm1b_bind(p, bank_len, m1_sea5_dqt()) == 0;
-    /* M1:s effektandel (DRY:EFF 0..100) står i varje zons chorus-send (tools/m1_sf2.py): chorusens masternivå 95 (0,75 av full: svängningen i 2-4 kHz nära originalets), så att 50 %
-     * ger lika mycket chorus som torr signal (fm1-sf2:s standard 30 av 127 gav E.Piano 3 en tredjedel av M1:s stereobredd) */
+    /* The M1's effect share (DRY:EFF 0..100) is in each zone's chorus send (tools/m1_sf2.py): the chorus's master level 95 (0.75 of full: the swing at 2-4 kHz close to the original's), so that 50 %
+     * gives as much chorus as dry signal (fm1-sf2's default 30 of 127 gave E.Piano 3 a third of the M1's stereo width) */
     sf2fx_set(sf2fx_reverb(), 95u);
     m1_setup_apply(set.setup);
-    m1_fx2_init(p, n);                           /* programmens effektdata: tabellen sist i banken */
+    m1_fx2_init(p, n);                           /* the programs' effect data: the table at the end of the bank */
     if (bank_ok && fm1b_program(0, set.program) < 0) {
         set.program = 127;
         program_select(1);
@@ -235,8 +235,8 @@ static struct {
     char msg[2][24];
     uint32_t msg_until, keys, btn;
     uint8_t redraw;
-    uint8_t page;                                /* 0 spelsidan, 1 FM-1 Setup (EDIT växlar) */
-    uint8_t field;                               /* Setup-sidans fält */
+    uint8_t page;                                /* 0 the play page, 1 FM-1 Setup (EDIT toggles) */
+    uint8_t field;                               /* the Setup page's field */
 } ui;
 
 void app_say(const char *a, const char *b)
@@ -259,11 +259,11 @@ static void input(void)
     uint32_t keys, btn = plat_buttons(), k;
     int32_t e;
     if (bank_ok)
-        fm1b_cache_service(FM1B_CACHE_FRAMES);   /* live cache: svara på notternas önskemål, avkoda några MP3-ramar */
+        fm1b_cache_service(FM1B_CACHE_FRAMES);   /* live cache: answer the notes' requests, decode a few MP3 frames */
     midi_in();
     touch_poll();
     keys = touch_keys();
-    for (k = 0; k < NKEYS && bank_ok; k++) {     /* tangent 0 är F3 (MIDI 53); panelen spelar kanal 1 */
+    for (k = 0; k < NKEYS && bank_ok; k++) {     /* key 0 is F3 (MIDI 53); the panel plays channel 1 */
         uint32_t bit = 1u << k, note = (uint32_t)(53 + (int32_t)k + 12 * set.octave);
         if (fm1b_queue_room() < 2u)
             break;
@@ -283,12 +283,12 @@ static void input(void)
         if ((k == B_OCTDN || k == B_OCTUP) && bank_ok) {
             int32_t o = clamp(set.octave + (k == B_OCTUP ? 1 : -1), -3, 3);
             if (o != set.octave) {
-                fm1b_panic();                    /* en hållen tangent hittar annars inte sin note off */
+                fm1b_panic();                    /* a held key would otherwise not find its note off */
                 set.octave = (int8_t)o;
                 set_dirty = 1;
                 ui.redraw = 1;
             }
-        } else if (k == B_EDIT) {                /* FM-1 Setup (som fm1-d50:s Setup-sida): EDIT in och ut */
+        } else if (k == B_EDIT) {                /* FM-1 Setup (like fm1-d50's Setup page): EDIT in and out */
             ui.page = ui.page ? 0u : 1u;
             ui.field = 0;
             ui.redraw = 1;
@@ -301,7 +301,7 @@ static void input(void)
             }
         }
     }
-    if (ui.page) {                               /* Setup-sidan: K1 flyttar fältet, K2 ändrar värdet */
+    if (ui.page) {                               /* the Setup page: K1 moves the field, K2 changes the value */
         if ((e = plat_enc(EN_K1)) != 0) {
             ui.field = (uint8_t)clamp((int32_t)ui.field + (e > 0 ? 1 : -1), 0, M1_SETUP_FIELDS - 1);
             ui.redraw = 1;
@@ -309,7 +309,7 @@ static void input(void)
         if ((e = plat_enc(EN_K2)) != 0 || (e = plat_enc(EN_PRESET)) != 0) {
             set.setup = m1_setup_set(set.setup, ui.field, m1_setup_get(set.setup, ui.field) + (e > 0 ? 1 : -1));
             m1_setup_apply(set.setup);
-            set_dirty = 1;                       /* sparas med SAVE */
+            set_dirty = 1;                       /* saved with SAVE */
             ui.redraw = 1;
         }
     } else if ((e = plat_enc(EN_PRESET)) != 0 && bank_ok) {
@@ -326,7 +326,7 @@ static void input(void)
 
 void app_input_only(void) { input(); }
 
-/* Setup-sidan i text. När LCD-grafiken kommer byts bara den här funktionen ut: modellen och lagringen ligger i m1_setup.h. */
+/* The Setup page as text. When the LCD graphics arrive only this function is replaced: the model and the storage are in m1_setup.h. */
 static void m1_setup_draw(const struct fm1b_status *st, unsigned avg)
 {
     char t[24];
@@ -371,7 +371,7 @@ static void draw(void)
         m1_setup_draw(&st, avg);
         return;
     }
-    /* ritytan rymmer 240 x 144 (gfx.c APP_CANVAS_PX): två remsor */
+    /* the canvas holds 240 x 144 (gfx.c APP_CANVAS_PX): two strips */
     cv_begin(240, 140, C_BLACK);
     cv_text(10, 6, &FONT_B, APP_NAME, C_WHITE);
     if (!bank_ok) {
@@ -421,7 +421,7 @@ void app_frame(void)
     if (!stamped) {
         stamped = 1;
         stamp0 = res_stamp();
-    } else if (!restart_at && res_stamp() != stamp0) {   /* ny bank skriven: starta om på den */
+    } else if (!restart_at && res_stamp() != stamp0) {   /* new bank written: restart on it */
         restart_at = (now + 2500u) | 1u;
         app_say("NEW DATA", "RESTART");
     }
@@ -433,7 +433,7 @@ void app_frame(void)
         ui.msg_until = 0;
         ui.redraw = 1;
     }
-    if (bank_ok && now - last_draw > 250u)       /* röster och CPU */
+    if (bank_ok && now - last_draw > 250u)       /* voices and CPU */
         ui.redraw = 1;
     if (ui.redraw) {
         ui.redraw = 0;

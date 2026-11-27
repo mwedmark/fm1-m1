@@ -1,4 +1,4 @@
-# FM-1 Setup: röstgräns 32 -> 8, SAVE, omstart, och att gränsen håller
+# FM-1 Setup: voice limit 32 -> 8, SAVE, restart, and that the limit holds
 wait 400
 tap EDIT
 wait 100

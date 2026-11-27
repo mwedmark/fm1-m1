@@ -1,4 +1,4 @@
-# M1-banken med live cache: piano (0), program 31 Strings, 5 Organ 1, trummor över MIDI kanal 10
+# The M1 bank with live cache: piano (0), program 31 Strings, 5 Organ 1, drums on MIDI channel 10
 wait 300
 wav m1_live.wav
 key 0 down 100

@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Gör en SoundFont (.sf2) av M1-tabellerna (tools/m1_os.py), PCM:en (tools/m1_rom.py) och, med --patches, M1:s program och
-trumkittar (tools/m1_syx.py). fm1-sf2:s omvandlare gör den sedan till en FM1B-bank (make_bank.js, pack_bank.js). Filen innehåller
-Korgs sampel och program från DIN dump: den är bara för eget bruk och hör inte hemma i git eller på nätet (roms/ är ignorerad).
+"""Makes a SoundFont (.sf2) from the M1 tables (tools/m1_os.py), the PCM (tools/m1_rom.py) and, with --patches, the M1's programs and
+drum kits (tools/m1_syx.py). fm1-sf2's converter then turns it into an FM1B bank (make_bank.js, pack_bank.js). The file contains
+Korg's samples and programs from YOUR dump: it is for your own use only and does not belong in git or online (roms/ is ignored).
 
   python -I tools/m1_sf2.py roms/gen/m1_tables.json roms/gen/m1_pcm.bin roms/gen/m1.sf2 --patches roms/gen/m1_patches.json
 
-Med --patches: bank 0, program 0..99 = M1:s program (OSC 1 och, för Double, OSC 2 som lager; Drum-program spelar sin trumkitt),
-bank 128, program 0..3 = trumkittarna. Utan: bank 0 = de råa multisounds, bank 128 = trumljuden på tangent 36 och uppåt.
+With --patches: bank 0, program 0..99 = the M1's programs (OSC 1 and, for Double, OSC 2 as a layer; Drum programs play their drum kit),
+bank 128, program 0..3 = the drum kits. Without: bank 0 = the raw multisounds, bank 128 = the drum sounds on key 36 and up.
 
-Hur ett M1-program blir SF2 (approximationer, se docs/M1_PROGRAMS.md): VDA-EG -> volymenvelope (M1:s decay och slope blir en
-decay), VDF -> lågpass med cutoff och VDF-EG som modulationsenvelope till cutoff, pitch MG -> vibrato-LFO, VDF MG -> mod-LFO till
-cutoff, oktav och intervall -> grovstämning, detune -> fininställning, VDA-nivå -> dämpning, effekttyp -> reverb-/chorus-send.
-M1:s tider och nivåer 0..99 räknas om med kurvorna nedan (uppskattade: justeras mot inspelningar av riktiga M1-program).
+How an M1 program becomes SF2 (approximations, see docs/M1_PROGRAMS.md): VDA-EG -> volume envelope (the M1's decay and slope become one
+decay), VDF -> low-pass with cutoff and VDF-EG as the modulation envelope to cutoff, pitch MG -> vibrato LFO, VDF MG -> mod LFO to
+cutoff, octave and interval -> coarse tuning, detune -> fine tuning, VDA level -> attenuation, effect type -> reverb/chorus send.
+The M1's times and levels 0..99 are converted with the curves below (estimated: adjusted against recordings of real M1 programs).
 """
 import argparse, array, json, math, struct, sys
 
@@ -21,21 +21,21 @@ G = dict(modLfoToPitch=5, vibLfoToPitch=6, modEnvToPitch=7, m1VelLevel=14, m1Vel
          sustainModEnv=29, releaseModEnv=30, attackVolEnv=34, holdVolEnv=35, decayVolEnv=36, sustainVolEnv=37,
          releaseVolEnv=38, instrument=41, keyRange=43, initialAttenuation=48, coarseTune=51, fineTune=52, sampleID=53,
          sampleModes=54, overridingRootKey=58)
-LOOP_GUARD = 8                     # SF2: åtta giltiga punkter efter loopslut (kopior av loopens början)
+LOOP_GUARD = 8                     # SF2: eight valid points after the loop end (copies of the loop's start)
 RAW_RELEASE_S = 0.3
 RAW_DRUM_KEY0 = 36
 
 
-# ---- M1:s 0..99 i fysiska enheter (uppskattat) ----
+# ---- the M1's 0..99 in physical units (estimated) ----
 def m1_time(p):
-    """EG-tid 0..99 i sekunder för ett helt steg (linjär nivå): 0 omedelbart, 11 cirka 0,12 s, 33 cirka 0,45 s, 62 cirka 1,2 s,
-    99 cirka 3,1 s. Anpassat till släppen i fabriksexemplen (Strings R33, Choir R44, Lore R62: 20 dB på 0,4, 0,6 och 1,1 s)
-    och attackerna (Choir, Strings A11-12 under 0,1-0,2 s)."""
+    """EG time 0..99 in seconds for a whole step (linear level): 0 instant, 11 about 0.12 s, 33 about 0.45 s, 62 about 1.2 s,
+    99 about 3.1 s. Fitted to the releases in the factory examples (Strings R33, Choir R44, Lore R62: 20 dB in 0.4, 0.6 and 1.1 s)
+    and the attacks (Choir, Strings A11-12 under 0.1-0.2 s)."""
     return 0.0 if p <= 0 else 0.002 + 0.457 * (1.021 ** p - 1)
 
 
-FALL = 4.5       # SF2:s decay och release är tiden för 100 dB i dB-linjär takt. Faktorn är uppmätt: med 4,5 faller Choir,
-                 # Strings och Lore efter släppet och Vibes (D89) och A.Bass (D75) i decay som i fabriksexemplen (10-50 dB/s)
+FALL = 4.5       # SF2's decay and release are the time for 100 dB at a dB-linear rate. The factor is measured: with 4.5 Choir,
+                 # Strings and Lore fall after the release, and Vibes (D89) and A.Bass (D75) in decay, as in the factory examples (10-50 dB/s)
 
 
 def tc(seconds):
@@ -43,7 +43,7 @@ def tc(seconds):
 
 
 def mg_hz(p):
-    """MG-frekvens 0..99: cirka 0,06 Hz till 20 Hz"""
+    """MG frequency 0..99: about 0.06 Hz to 20 Hz"""
     return 0.06 * 1.06 ** p
 
 
@@ -52,28 +52,28 @@ def lfo_cents_abs(hz):
 
 
 def cB_ratio(a, b):
-    """dämpning i centibel för nivån a jämfört med b (a, b > 0)"""
+    """attenuation in centibels for level a compared with b (a, b > 0)"""
     return max(0, min(1440, round(200 * math.log10(b / a))))
 
 
-# M1:s effekttyper (Owner's Manual s. 40-53). I programdatan är typen manualens nummer minus 1 (0 = Hall): parametrarna visar det
-# (typ 0 har reverbens layout, 9 och 10 delayens, 17 tremolo i Vibes, 24 rotary i Organ 1). Motorn har reverb, chorus och en
-# delay på hela utgången (fm1base/m1_fx.c); varje typ får (buss, vikt) för reverb- och chorus-sendarna:
-#   0-5 hall, room, live stage: reverb 1,0. 6-8 early reflection: reverb 0,6.
-#   9 stereo delay, 10 cross delay, 28 delay/delay: bara delayen.
-#   11-12 chorus, 13-14 flanger, 15-16 phaser, 23 symphonic ensemble, 24 rotary: chorus 1,0.
-#   25-27 delay/hall, delay/room, delay/early reflection: delay och reverb 0,8. 29-30 delay/chorus, delay/flanger: delay och chorus.
-#   31-32 delay/phaser, delay/tremolo: delay och chorus 0,5 (phaser) eller inget (tremolo).
-#   17-18 tremolo, 19 EQ, 20 overdrive, 21 distortion, 22 exciter: inget.
-DRUM_RELEASE_S = 3.0                         # trummor: release efter tangent upp (de spelas klart)
+# The M1's effect types (Owner's Manual p. 40-53). In the program data the type is the manual's number minus 1 (0 = Hall): the parameters show it
+# (type 0 has the reverb's layout, 9 and 10 the delay's, 17 tremolo in Vibes, 24 rotary in Organ 1). The engine has reverb, chorus and a
+# delay on the whole output (fm1base/m1_fx.c); each type gets (bus, weight) for the reverb and chorus sends:
+#   0-5 hall, room, live stage: reverb 1.0. 6-8 early reflection: reverb 0.6.
+#   9 stereo delay, 10 cross delay, 28 delay/delay: only the delay.
+#   11-12 chorus, 13-14 flanger, 15-16 phaser, 23 symphonic ensemble, 24 rotary: chorus 1.0.
+#   25-27 delay/hall, delay/room, delay/early reflection: delay and reverb 0.8. 29-30 delay/chorus, delay/flanger: delay and chorus.
+#   31-32 delay/phaser, delay/tremolo: delay and chorus 0.5 (phaser) or nothing (tremolo).
+#   17-18 tremolo, 19 EQ, 20 overdrive, 21 distortion, 22 exciter: nothing.
+DRUM_RELEASE_S = 3.0                         # drums: release after key up (they play to the end)
 FX_BUS = {**{t: ("reverb", 1.0) for t in range(0, 6)}, **{t: ("reverb", 0.6) for t in (6, 7, 8)},
-          **{t: ("chorus", 1.0) for t in (11, 12, 15, 16, 29, 30)},      # 13-14 flanger, 23 symphonic, 24 rotary: egna effekter (m1_fx2.c)
+          **{t: ("chorus", 1.0) for t in (11, 12, 15, 16, 29, 30)},      # 13-14 flanger, 23 symphonic, 24 rotary: effects of their own (m1_fx2.c)
           **{t: ("reverb", 0.8) for t in (25, 26, 27)}, 31: ("chorus", 0.5)}
 DELAY_TYPES = {9: "stereo", 10: "cross", 25: "a", 26: "a", 27: "a", 28: "dual", 29: "a", 30: "a", 31: "a", 32: "a"}
 
 
 def m1_mod_mhz(v):
-    """MG-hastighet (tabell *11-3-2): 0..99 = 0,03..3,00 Hz i steg om 0,03; 100..199 = 3,1..13,0 i steg om 0,1; 200..216 = 14..30"""
+    """MG rate (table *11-3-2): 0..99 = 0.03..3.00 Hz in steps of 0.03; 100..199 = 3.1..13.0 in steps of 0.1; 200..216 = 14..30"""
     if v <= 99:
         return 30 * (v + 1)
     if v <= 199:
@@ -82,24 +82,24 @@ def m1_mod_mhz(v):
 
 
 CHORUS_PARAMS = {11: (0, 1, 4), 12: (0, 1, 4), 13: (0, 1, 4), 14: (0, 1, 4), 15: (0, 1, None), 16: (0, 1, None),
-                 29: (4, 5, None), 30: (4, 5, None)}   # (djup, hastighet, delay) i effektens 8 parameterbyten (tabell *11-3)
+                 29: (4, 5, None), 30: (4, 5, None)}   # (depth, rate, delay) in the effect's 8 parameter bytes (table *11-3)
 
 
 def chorus_fx(e):
-    """Programmets chorus/flanger/phaser som (hastighet mHz, djup 0..99, delay ms) för motorns chorus, eller None (fm1-sf2:s fasta)"""
+    """The program's chorus/flanger/phaser as (rate mHz, depth 0..99, delay ms) for the engine's chorus, or None (fm1-sf2's fixed one)"""
     for t, p in ((e["type1"], e["param1"]), (e["type2"], e["param2"])):
         if t not in CHORUS_PARAMS:
             continue
         di, si, dl = CHORUS_PARAMS[t]
-        delay = p[dl] if dl is not None else (1 if t in (15, 16) else 5)   # phaser: kort; delay/chorus: 5 ms
+        delay = p[dl] if dl is not None else (1 if t in (15, 16) else 5)   # phaser: short; delay/chorus: 5 ms
         return m1_mod_mhz(p[si]), min(99, p[di]), max(1, min(200, delay))
     return None
 
 
 def delay_fx(e):
-    """Programmets delay (den första effekten som har en) som (vänster ms, höger ms, feedback -99..99, high damp 0..99,
-    andel 0..100, korsad), eller None. Parametrarna enligt tabell *11-3: stereo/cross delay: tid V (2 byte), feedback, high damp,
-    tid H (2 byte); kombinationstyperna: delayens tid (2 byte), feedback, high damp på kanal A, andelen är kanal A:s balans."""
+    """The program's delay (the first effect that has one) as (left ms, right ms, feedback -99..99, high damp 0..99,
+    share 0..100, crossed), or None. The parameters per table *11-3: stereo/cross delay: time L (2 bytes), feedback, high damp,
+    time R (2 bytes); the combination types: the delay's time (2 bytes), feedback, high damp on channel A, the share is channel A's balance."""
     s8 = lambda v: v - 256 if v > 127 else v
     for t, p, bal in ((e["type1"], e["param1"], e["balance"][0:2]), (e["type2"], e["param2"], e["balance"][2:4])):
         kind = DELAY_TYPES.get(t)
@@ -131,9 +131,9 @@ class Builder:
     def __init__(self, tab, pcm):
         self.tab, self.pcm = tab, pcm
         self.smpl = array.array("h")
-        self.shdr = []             # (namn, start, slut, loopstart, loopslut, loop)
+        self.shdr = []             # (name, start, end, loop start, loop end, loop)
         self.ids = {}
-        self.insts = []            # (namn, [[(gen, värde), ...] per zon])
+        self.insts = []            # (name, [[(gen, value), ...] per zone])
 
     def sample(self, i, base, label):
         key = (i, base)
@@ -144,11 +144,11 @@ class Builder:
         if not (0 <= st < en <= len(pcm)):
             return None
         loop = s["loop"] and 0 <= lp < en
-        if loop and st - 16 <= lp < st:             # loopen börjar strax före start (hela samplet loopas): ta med de samplen
+        if loop and st - 16 <= lp < st:             # the loop starts just before the start (the whole sample loops): include those samples
             st = lp
         at = len(self.smpl)
         self.smpl.extend(pcm[st:en])
-        if loop and lp < st:                        # loopen ligger före start (DWGS, Rhythm): spela start..slut, sedan loopen
+        if loop and lp < st:                        # the loop lies before the start (DWGS, Rhythm): play start..end, then the loop
             ls = len(self.smpl)
             self.smpl.extend(pcm[lp:en])
         else:
@@ -164,7 +164,7 @@ class Builder:
         return self.ids[key]
 
     def multisound_zones(self, ms_index, common, label):
-        """M1-multisoundens zoner som SF2-zoner, var och en med common (generatorer) före sina egna"""
+        """The M1 multisound's zones as SF2 zones, each with common (generators) before its own"""
         m = self.tab["multisounds"][ms_index]
         base = m.get("dwgs_base", 0)
         out, lo = [], 0
@@ -195,9 +195,9 @@ class Builder:
             sid = self.sample(dr["sample"], bank1 * self.tab["samples"][dr["sample"]].get("bank", 0), dr["name"][:19])
             if sid is None:
                 continue
-            cents = 10 * k["tune"]                  # stämning -120..120: tolkad som tiondels halvtoner (inte verifierat)
-            # decay per tangent (-99..99, 0 = programmets): M1:s kittar har ingen choke (stäng öppen hi-hat med stängd): längden styrs av detta
-            # värde (kit 2:s öppna hi-hat har -22 och -99). Skala decay-tiden: 60 timecent (1/20 oktav i tid) per steg; ej verifierad skala.
+            cents = 10 * k["tune"]                  # tuning -120..120: interpreted as tenths of semitones (not verified)
+            # decay per key (-99..99, 0 = the program's): the M1's kits have no choke (closing an open hi-hat with a closed one): the length is controlled by this
+            # value (kit 2's open hi-hat has -22 and -99). Scale the decay time: 60 timecents (1/20 octave in time) per step; scale not verified.
             com = list(common)
             if k["decay"]:
                 com = [(g, v + 60 * k["decay"] if g == "decayVolEnv" else v) if g == "decayVolEnv" else (g, v) for g, v in com]
@@ -211,7 +211,7 @@ class Builder:
         return out
 
     def write(self, path, presets):
-        """presets: (namn, program, bank, instrumentindex)"""
+        """presets: (name, program, bank, instrument index)"""
         inst_b, ibag, igen = b"", b"", b""
         for n, zones in self.insts:
             inst_b += name20(n) + struct.pack("<H", len(ibag) // 4)
@@ -246,14 +246,14 @@ class Builder:
         with open(path, "wb") as f:
             f.write(b"RIFF" + struct.pack("<I", len(body)) + body)
         used = sum(e - s for _, s, e, *_ in self.shdr)
-        print(f"skrev {path}: {len(presets)} presets, {len(self.shdr)} sampel, {used} sampelpunkter ({used / rate:.1f} s)")
+        print(f"wrote {path}: {len(presets)} presets, {len(self.shdr)} samples, {used} sample points ({used / rate:.1f} s)")
 
 
-# ---- ett M1-program ----
+# ---- an M1 program ----
 def eg_segments(eg, al, bp):
-    """M1-EG:ns attack och decay + slope som SF2:s attack och decay. Stiger nivån efter attacken (break point över attack level)
-    och är attacknivån låg räcker attacken till break point; når attacken redan halva toppen (Piano: 90 och sedan 99) är den
-    kvarvarande stigningen för liten att höra och attacken förblir kort."""
+    """The M1 EG's attack and decay + slope as SF2's attack and decay. If the level rises after the attack (break point above attack level)
+    and the attack level is low, the attack lasts to the break point; if the attack already reaches half the peak (Piano: 90 and then 99) the
+    remaining rise is too small to hear and the attack stays short."""
     if bp > al and al < bp / 2:
         return m1_time(eg["attack_time"]) + m1_time(eg["decay_time"]), m1_time(eg["slope_time"])
     if bp > al:
@@ -262,7 +262,7 @@ def eg_segments(eg, al, bp):
 
 
 def amp_env(eg, level):
-    """VDA-EG (tider 0..99, nivåer 0..99) och oscillatorns nivå som SF2:s volymenvelope och dämpning"""
+    """VDA-EG (times 0..99, levels 0..99) and the oscillator's level as SF2's volume envelope and attenuation"""
     al, bp, sl = eg["attack_level"], eg["break_point"], eg["sustain_level"]
     peak = max(al, bp, sl, 1)
     attack, decay = eg_segments(eg, al, bp)
@@ -273,25 +273,25 @@ def amp_env(eg, level):
     return gens, atten
 
 
-FC_LO, FC_HI = 5000, 13500                       # VDF cutoff 0 och 99 i absoluta cent (ca 150 Hz och 20 kHz): uppskattat
+FC_LO, FC_HI = 5000, 13500                       # VDF cutoff 0 and 99 in absolute cents (about 150 Hz and 20 kHz): estimated
 FC_STEP = (FC_HI - FC_LO) / 99
 
 
 def filter_gens(vdf, eg):
-    """VDF: cutoff 0..99 linjärt i cent mellan FC_LO och FC_HI. VDF-EG (nivåer -99..99) gånger EG-intensiteten flyttar cutoff
-    lika många steg som cutoff själv (intensitet 99 och nivå 99 = 99 steg). SF2:s modulationsenvelope går bara 0..1, så den
-    lägsta nivån (sustain eller 0) blir botten och ligger i initialFilterFc."""
-    k = vdf["eg_int"] / 99 * FC_STEP                # cent per EG-nivå
+    """VDF: cutoff 0..99 linear in cents between FC_LO and FC_HI. VDF-EG (levels -99..99) times the EG intensity moves the cutoff
+    as many steps as the cutoff itself (intensity 99 and level 99 = 99 steps). SF2's modulation envelope only goes 0..1, so the
+    lowest level (sustain or 0) becomes the bottom and goes in initialFilterFc."""
+    k = vdf["eg_int"] / 99 * FC_STEP                # cents per EG level
     lv = [eg["attack_level"], eg["break_point"], eg["sustain_level"]]
     hold = eg["release_level"] > eg["sustain_level"]
-    if hold:                                        # filtret ska öppna mot release level när tangenten släpps; SF2:s envelope
-        lv[2] = (eg["sustain_level"] + eg["release_level"]) // 2   # kan bara falla, så sustain hamnar mitt emellan och
-                                                    # releasen håller den nivån (releaseModEnv lång)
+    if hold:                                        # the filter should open towards the release level when the key is released; SF2's envelope
+        lv[2] = (eg["sustain_level"] + eg["release_level"]) // 2   # can only fall, so sustain ends up in between and
+                                                    # the release holds that level (long releaseModEnv)
     lo, hi = min(min(lv), 0), max(max(lv), 0)
     fc = FC_LO + vdf["cutoff"] * FC_STEP
     if not k or hi == lo:
         return [("initialFilterFc", round(min(FC_HI, fc)))]
-    if hi <= 0:                                     # bara negativa nivåer: envelopen vänd, toppen är det lägsta
+    if hi <= 0:                                     # only negative levels: the envelope inverted, the peak is the lowest
         span, base = round(k * (lo - 0)), fc
         al, bp, sl = (-x for x in lv)
         peak = -lo
@@ -306,19 +306,19 @@ def filter_gens(vdf, eg):
             ("releaseModEnv", tc(20.0) if hold else tc(max(m1_time(eg["release_time"]), 0.005)))]
 
 
-PITCH_CENTS = 1200 / 99                 # pitch-EG-nivå ±99 = ungefär ±1 oktav (manualen s. 24)
-PITCH_WINS = 20                         # när filtret också har en envelope: pitch-EG:n får den bara vid svep från nivå 20
+PITCH_CENTS = 1200 / 99                 # pitch EG level ±99 = about ±1 octave (the manual p. 24)
+PITCH_WINS = 20                         # when the filter also has an envelope: the pitch EG only gets it for sweeps from level 20
 
 
 def pitch_gens(peg):
-    """Pitch-EG: start level -> attack level (attack time) -> 0 (decay time), som SF2:s modulationsenvelope till tonhöjd.
-    Ger (nivå, generatorer) eller (0, []). Release time och release level (glidning när tangenten släpps) följer inte med:
-    envelopen kan bara gå tillbaka till 0."""
+    """Pitch EG: start level -> attack level (attack time) -> 0 (decay time), as SF2's modulation envelope to pitch.
+    Gives (level, generators) or (0, []). Release time and release level (a glide when the key is released) do not come along:
+    the envelope can only go back to 0."""
     S, A = peg["start_level"], peg["attack_level"]
     at, dt = m1_time(peg["attack_time"]), m1_time(peg["decay_time"])
-    if A and dt > 0.001 and abs(A) > abs(S):          # stiger till attack level och faller sedan till 0
+    if A and dt > 0.001 and abs(A) > abs(S):          # rises to the attack level and then falls to 0
         lvl, attack, decay = A, at, dt
-    elif S and at > 0.001:                             # börjar vid start level och glider till tonen
+    elif S and at > 0.001:                             # starts at the start level and glides to the note
         lvl, attack, decay = S, 0.0, at + (dt if A else 0.0)
     else:
         return 0, []
@@ -342,30 +342,30 @@ def program_zones(b, prog, kits):
     e = prog["effects"]
     send = {"reverb": 0.0, "chorus": 0.0}
     for t, bal in ((e["type1"], e["balance"][0:2]), (e["type2"], e["balance"][2:4])):
-        if t in FX_BUS:                          # balans 0..100 per kanal: effektens andel av utgången (DRY:EFF)
+        if t in FX_BUS:                          # balance 0..100 per channel: the effect's share of the output (DRY:EFF)
             bus, k = FX_BUS[t]
             send[bus] = max(send[bus], k * min(100, sum(bal) / 2) / 100)
     sends = [(f"{bus}Send", round(1000 * min(1.0, 1.5 * v))) for bus, v in send.items() if v > 0]
-    # M1:s DRY:EFF sänker den torra signalen med effektandelen: torrt × (1 - andel) + effekt × andel. Motorn lägger effekten över fullt torrt,
-    # så nivån per zon sänks med samma faktor (sendet följer med, förhållandet torrt/effekt är oförändrat). Utan det blev summan
-    # över full skala och klippte (E.Piano 3: C-E-G).
+    # The M1's DRY:EFF lowers the dry signal by the effect share: dry × (1 - share) + effect × share. The engine adds the effect on top of full dry,
+    # so the level per zone is lowered by the same factor (the send follows, the dry/effect ratio is unchanged). Without it the sum
+    # went over full scale and clipped (E.Piano 3: C-E-G).
     d0 = delay_fx(e)
     dry = (1 - min(0.8, send["chorus"])) * (1 - 0.5 * min(0.8, send["reverb"])) * (1 - 0.8 * min(0.8, d0[4] / 100 if d0 else 0))
     fx_atten = round(-200 * math.log10(dry))     # cB
-    d = delay_fx(e)                             # delayen (fm1base/m1_fx.c) i SF2:s oanvända generatorer, bit 15 = posten finns
+    d = delay_fx(e)                             # the delay (fm1base/m1_fx.c) in SF2's unused generators, bit 15 = the record exists
     fx = [("m1FxFlags", -0x8000 + ((d[5] << 14 | d[3] << 7 | d[4]) if d else 0))]
     if d:
         fx += [("m1FxLeft", d[0]), ("m1FxRight", d[1]), ("m1FxFeedback", d[2])]
-    c = chorus_fx(e)                            # chorusens form (fm1base/m1_fx.c -> sf2fx_chorus_shape)
+    c = chorus_fx(e)                            # the chorus's shape (fm1base/m1_fx.c -> sf2fx_chorus_shape)
     if c:
-        packed = min(3000, c[0] // 10) | round(c[1] * 15 / 99) << 12          # 16 bitar, skrivs med tecken
+        packed = min(3000, c[0] // 10) | round(c[1] * 15 / 99) << 12          # 16 bits, written signed
         fx += [("m1ChoRate", packed - 0x10000 if packed > 0x7FFF else packed), ("m1ChoDelay", c[2] * 10)]
-    fx += [("m1ProgIdx", prog["index"] + 1)]     # programnumret + 1: appen slår upp programmets effekter (m1_fx2.c) i tabellen sist i banken
+    fx += [("m1ProgIdx", prog["index"] + 1)]     # the program number + 1: the app looks up the program's effects (m1_fx2.c) in the table at the end of the bank
     if prog["mode"] == "drum":
         kit = kits[prog["osc1_ms"]] if prog["osc1_ms"] < len(kits) else []
         env, atten = amp_env(prog["osc1"]["vda_eg"], prog["osc1"]["vda"]["level"])
-        # trumljuden spelas klart: tangent upp klipper dem inte (programmen har decay 96 men release 1, vilket bara ger mening om ljudet
-        # lever efter att tangenten släppts). Lång release i stället för den korta.
+        # the drum sounds play to the end: key up does not cut them off (the programs have decay 96 but release 1, which only makes sense if the sound
+        # lives on after the key is released). Long release instead of the short one.
         env = [g for g in env if g[0] != "releaseVolEnv"] + [("releaseVolEnv", tc(DRUM_RELEASE_S))]
         return b.drum_zones(kit, env + sends + fx)
     zones = []
@@ -380,16 +380,16 @@ def program_zones(b, prog, kits):
         filt = filter_gens(o["vdf"], o["vdf_eg"])
         lvl, pitch = pitch_gens(o["pitch_eg"])
         if pitch and any(g[0] == "modEnvToFilterFc" for g in filt):
-            if abs(lvl) >= PITCH_WINS:                  # stort svep: tonhöjden får envelopen, filtret står på sin sustain
+            if abs(lvl) >= PITCH_WINS:                  # large sweep: the pitch gets the envelope, the filter stays at its sustain
                 f = dict(filt)
                 fc = f["initialFilterFc"] + f["modEnvToFilterFc"] * (1 - f["sustainModEnv"] / 1000)
                 filt = [("initialFilterFc", round(max(1500, min(FC_HI, fc))))]
             else:
                 pitch = []
-        # velocity (tools/fm1b_make_bank.js): VDA velocity sense och VDF EG intensity velocity sense i SF2:s oanvända generatorer
+        # velocity (tools/fm1b_make_bank.js): VDA velocity sense and VDF EG intensity velocity sense in SF2's unused generators
         vel = [("m1VelLevel", o["vda"]["vel"] + 100), ("m1VelFc", o["vdf"]["eg_int_vel"])]
-        # VDF cutoff keyboard tracking (manualen s. 27): ±99 = cutoff följer tonhöjden 1:1 (100 cent per tangent), noll vid center key
-        # (MIDI-ton). Motorn lägger (ton - center) × 0,1 cent × fältet till cutoff när tonen startar.
+        # VDF cutoff keyboard tracking (the manual p. 27): ±99 = the cutoff follows the pitch 1:1 (100 cents per key), zero at the center key
+        # (MIDI note). The engine adds (note - center) × 0.1 cent × the field to the cutoff when the note starts.
         track = o["vdf"]["kbd_track"]
         key = [("m1KeyFc", round(track * 1000 / 99)), ("m1KeyCenter", o["vdf"]["kbd_center"])] if track else []
         common = env + filt + pitch + mg_gens(prog, which) + sends + vel + fx + key
@@ -404,7 +404,7 @@ def main():
     ap.add_argument("pcm")
     ap.add_argument("out")
     ap.add_argument("--patches")
-    ap.add_argument("--variants", action="store_true", help="lägger fem testvarianter av E.Piano 3 på programplats 100-104")
+    ap.add_argument("--variants", action="store_true", help="adds five test variants of E.Piano 3 at program slots 100-104")
     a = ap.parse_args()
     tab = json.load(open(a.tables, encoding="utf-8"))
     pcm = array.array("h")
@@ -417,7 +417,7 @@ def main():
         for prog in pat["programs"]:
             b.insts.append((prog["name"], program_zones(b, prog, kits)))
             presets.append((prog["name"], prog["index"], 0, len(b.insts) - 1))
-        if a.variants:                          # felsökning: en sak i taget avstängd i E.Piano 3 (program 91)
+        if a.variants:                          # debugging: one thing at a time switched off in E.Piano 3 (program 91)
             import copy
             base = pat["programs"][91]
             def variant(name, edit):
@@ -435,8 +435,8 @@ def main():
                 v["effects"].update(type1=19, type2=19, balance=[0, 0, 0, 0])
             def darker(v):
                 v["osc1"]["vdf"]["cutoff"] = max(0, v["osc1"]["vdf"]["cutoff"] - 20)
-            variant("T1 NoFiltr", nofilter); variant("T2 Att 15", att); variant("T3 EG halv", eghalf)
-            variant("T4 Torr", dry); variant("T5 Morkare", darker)
+            variant("T1 NoFilter", nofilter); variant("T2 Att 15", att); variant("T3 EG half", eghalf)
+            variant("T4 Dry", dry); variant("T5 Darker", darker)
         for k, kit in enumerate(kits):
             if not kit:
                 continue

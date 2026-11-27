@@ -1,13 +1,13 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* M1:s enda -O2-enhet (fm1.toml o2): fm1-sf2:s sampelmotor (engine/, kopierad från fm1-sf2 5a4f267). Här och inte i plattformens
- * unity-build, där deras statiska namn skulle krocka med plattformens. */
+/* The M1's only -O2 unit (fm1.toml o2): fm1-sf2's sample engine (engine/, copied from fm1-sf2 5a4f267). Here and not in the platform's
+ * unity build, where their static names would collide with the platform's. */
 #include "../engine/fm1b.c"
 
-/* SEA5-tabellen till fm1b_bind (fm1b_dqt.inc är static, så den ges ut härifrån) */
+/* the SEA5 table for fm1b_bind (fm1b_dqt.inc is static, so it is handed out from here) */
 #include "../engine/fm1b_dqt.inc"
 const int16_t *m1_sea5_dqt(void) { return fm1b_dqt; }
 
-/* minimp3 (live_cache/mp3_sound.c) behöver memmove; felucca-bsp:s libc har bara memset, memcpy och memcmp (host och webb har sin egen) */
+/* minimp3 (live_cache/mp3_sound.c) needs memmove; felucca-bsp's libc only has memset, memcpy and memcmp (host and web have their own) */
 #ifndef PLAT_HOST
 void *memmove(void *d, const void *s, unsigned n)
 {

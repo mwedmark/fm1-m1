@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Avkodar en Korg M1 SysEx-dump (.syx) till JSON med namngivna fält: alla program (func 4C), alla kombinationer (4D) och
-globaldata med trumkittarna (51). Formatet är M1 Owner's Manual, "MIDI Exclusive Format", tabell 1–3 (s. 124–131).
+"""Decodes a Korg M1 SysEx dump (.syx) to JSON with named fields: all programs (func 4C), all combinations (4D) and
+global data with the drum kits (51). The format is the M1 Owner's Manual, "MIDI Exclusive Format", tables 1–3 (p. 124–131).
 
   python -I tools/m1_syx.py "M1 files/MPC-00/Int_M1.syx" --out roms/gen/m1_patches.json
 
-Värden med tecken (-99..99, -12..12 ...) är tvåkomplement i en byte och skrivs ut med tecken. Programdatan är användarens
-egen och hamnar bara i roms/ (ignorerad).
+Signed values (-99..99, -12..12 ...) are two's complement in one byte and are printed with their sign. The program data is the user's
+own and only ends up in roms/ (ignored by git).
 """
 import argparse, json, sys
 
@@ -19,7 +19,7 @@ def s8(b):
 
 
 def unpack7(data):
-    """Korgs packning: en byte med de sju följande bytenas bit 7, sedan de sju bytena."""
+    """Korg's packing: one byte with the bit 7 of the seven following bytes, then the seven bytes."""
     out = bytearray()
     for g in range(0, len(data), 8):
         msb = data[g]
@@ -46,13 +46,13 @@ def name(b):
 
 
 def eg_switches(v):
-    """*1: bit 0..3 attack, decay, slope, release på; bit 4..7 deras polaritet (0 +, 1 -)"""
+    """*1: bit 0..3 attack, decay, slope, release on; bit 4..7 their polarity (0 +, 1 -)"""
     st = ("attack", "decay", "slope", "release")
     return {s: {"on": bool(v >> i & 1), "neg": bool(v >> (4 + i) & 1)} for i, s in enumerate(st)}
 
 
 def osc(p, o):
-    """parametrarna 63..102 för OSC 1 (o = 0) eller 103..142 för OSC 2 (o = 40)"""
+    """parameters 63..102 for OSC 1 (o = 0) or 103..142 for OSC 2 (o = 40)"""
     b = lambda n: p[n + o]
     sb = lambda n: s8(p[n + o])
     return {
@@ -79,7 +79,7 @@ def mg(p, n):
 
 
 def effects(p, at):
-    """*11: 25 byte effektparametrar"""
+    """*11: 25 bytes of effect parameters"""
     e = p[at:at + 25]
     return {"type1": e[0], "type2": e[1], "balance": [e[2], e[3], e[4], e[5]], "pan3": e[6], "pan4": e[7],
             "io": e[8], "param1": list(e[9:17]), "param2": list(e[17:25])}
@@ -139,7 +139,7 @@ def main():
             continue
         f = m[4]
         if f in (FUNC_ALL_PROG, FUNC_ALL_COMBI, FUNC_GLOBAL):
-            d = unpack7(m[6:-1])                 # m[5]: minnesallokering och bank (NOTE 3)
+            d = unpack7(m[6:-1])                 # m[5]: memory allocation and bank (NOTE 3)
             if f == FUNC_ALL_PROG:
                 n = len(d) // PROG_BYTES
                 res["programs"] = [program(d[i * PROG_BYTES:(i + 1) * PROG_BYTES], i) for i in range(n)]
@@ -152,19 +152,19 @@ def main():
             d = unpack7(m[5:-1])
             res.setdefault("programs", []).append(program(d[:PROG_BYTES], len(res.get("programs", []))))
     if not res:
-        sys.exit("inga M1-dumpar i filen")
+        sys.exit("no M1 dumps in the file")
     P, C = res.get("programs", []), res.get("combinations", [])
-    print(f"{len(P)} program, {len(C)} kombinationer, globaldata {'ja' if 'global' in res else 'nej'}")
+    print(f"{len(P)} programs, {len(C)} combinations, global data {'yes' if 'global' in res else 'no'}")
     for p in P[:6]:
         print(f"  P{p['index']:02d} {p['name']:10} {p['mode']:6} OSC1 ms {p['osc1_ms']:2} OSC2 ms {p['osc2_ms']:2} "
               f"VDF {p['osc1']['vdf']['cutoff']:2} VDA-EG A{p['osc1']['vda_eg']['attack_time']} D{p['osc1']['vda_eg']['decay_time']} "
               f"S{p['osc1']['vda_eg']['sustain_level']} R{p['osc1']['vda_eg']['release_time']}")
     if "global" in res:
-        print("  trumkittar:", [len(k) for k in res["global"]["drum_kits"]], "tangenter")
+        print("  drum kits:", [len(k) for k in res["global"]["drum_kits"]], "keys")
     if a.out:
         with open(a.out, "w", encoding="utf-8") as f:
             json.dump(res, f, indent=1, ensure_ascii=False)
-        print(f"skrev {a.out}")
+        print(f"wrote {a.out}")
 
 
 if __name__ == "__main__":

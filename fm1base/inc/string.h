@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* fm1-base har inga libc-huvuden: felucca-bsp:s chip/libc.c definierar memset, memcpy och memcmp (som fm1-d50/fm1base/inc). */
+/* fm1-base has no libc headers: felucca-bsp's chip/libc.c defines memset, memcpy and memcmp (as in fm1-d50/fm1base/inc). */
 #pragma once
 #include <stddef.h>
 void *memset(void *d, int c, unsigned n);

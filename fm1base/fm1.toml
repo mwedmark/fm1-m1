@@ -1,13 +1,13 @@
-# M1 på fm1-base (tools/build.py i en fm1-base-checkout med data_lo, som fm1-d50). Bygg:
-#   python3 tools/build.py ../fm1-m1/fm1base --no-ble          (i fm1-base, bredvid det här repot)
+# M1 on fm1-base (tools/build.py in an fm1-base checkout with data_lo, like fm1-d50). Build:
+#   python3 tools/build.py ../fm1-m1/fm1base --no-ble          (in fm1-base, beside this repository)
 name = "M1"
 id_prefix = "FM-1_61"
 usb_manufacturer = "fm1-m1"
 usb_product = "M1 FM-1"
-# appen i [0x4000, 0x34000) (192 KB: bilden är ~148 KB), dataområdet från 0x34000, så stort som möjligt för sampel. Ljudbanken (FM1B) ligger i resursregionen
-# 0x34000 .. 0xDE000, 696 320 B (app.h APP_RES_BASE), panelens kalibrering i 0xDE000..0xDFFFF, inställningarna i 0xFC000
+# the app in [0x4000, 0x34000) (192 KB: the image is ~148 KB), the data area from 0x34000, as large as possible for samples. The sound bank (FM1B) is in the resource region
+# 0x34000 .. 0xDE000, 696 320 B (app.h APP_RES_BASE), the panel's calibration in 0xDE000..0xDFFFF, the settings in 0xFC000
 data_lo = 0x34000
-# användarens egen bank (aldrig Korgs data i repot eller i en publicerad build): valfri vid byggtid
+# the user's own bank (never Korg's data in the repo or in a published build): optional at build time
 resources = "../roms/out/m1.fm1b"
 resources_what = "M1 data"
 resources_var = true

@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""Spelar ett test på en FM-1 med M1-firmware över USB-MIDI och läser av dess mätvärden (fm1base/app.c app_sysex):
-CPU, missade ljudblock, röster, CPU-vaktens kapningar och live cachens räknare. Behöver mido med python-rtmidi.
+"""Plays a test on an FM-1 with the M1 firmware over USB-MIDI and reads its measurements (fm1base/app.c app_sysex):
+CPU, missed audio blocks, voices, the CPU guard's cuts and the live cache's counters. Needs mido with python-rtmidi.
 
   python tools/m1_measure.py [--port "M1 FM-1"] [--test chords|programs|drums|full|all]
 
-chords: åttaklangsackord på program 0, 31 och 5 (16 röster); programs: ackord på varannan multisound i snabb takt (cachen tvingas
-avkoda); drums: trumljuden på kanal 10; full: 40 toner Strings samtidigt (alla röster). Under och efter varje del skrivs mätvärdena ut som skillnad mot början.
+chords: eight-note chords on programs 0, 31 and 5 (16 voices); programs: chords on every other multisound at a fast pace (the cache is forced to
+decode); drums: the drum sounds on channel 10; full: 40 notes of Strings at once (all voices). During and after each part the measurements are printed as the difference from the start.
 """
 import argparse, sys, time
 
-NAMES = ["cpu_medel", "cpu_topp", "cpu_nu", "missade_block", "röster", "röstgräns", "röster_kapade", "vakt_kapade",
-         "cache_träff", "cache_miss", "cache_utkastade", "cache_utan_plats", "mp3_ramar", "cache_begärda", "noter_tappade",
-         "cache_väntar"]
-CUMULATIVE = {"missade_block", "röster_kapade", "vakt_kapade", "cache_träff", "cache_miss", "cache_utkastade",
-              "cache_utan_plats", "mp3_ramar", "cache_begärda", "noter_tappade"}
+NAMES = ["cpu_avg", "cpu_peak", "cpu_now", "missed_blocks", "voices", "voice_limit", "voices_cut", "guard_cut",
+         "cache_hit", "cache_miss", "cache_evicted", "cache_no_room", "mp3_frames", "cache_requested", "notes_dropped",
+         "cache_waiting"]
+CUMULATIVE = {"missed_blocks", "voices_cut", "guard_cut", "cache_hit", "cache_miss", "cache_evicted",
+              "cache_no_room", "mp3_frames", "cache_requested", "notes_dropped"}
 
 
 def main():
@@ -25,7 +25,7 @@ def main():
     inn = next((n for n in mido.get_input_names() if a.port in n), None)
     out = next((n for n in mido.get_output_names() if a.port in n), None)
     if not inn or not out:
-        sys.exit(f"ingen MIDI-port med {a.port!r}: {mido.get_input_names()}")
+        sys.exit(f"no MIDI port with {a.port!r}: {mido.get_input_names()}")
     with mido.open_input(inn) as mi, mido.open_output(out) as mo:
         def ask():
             for _ in mi.iter_pending():
@@ -38,7 +38,7 @@ def main():
                     if d[:4] == [0x7D, ord("M"), ord("1"), 0x41] and len(d) == 4 + 80:
                         return {NAMES[i]: sum(d[4 + 5 * i + k] << (7 * k) for k in range(5)) for i in range(16)}
                 time.sleep(0.005)
-            sys.exit("FM-1 svarar inte på mätfrågan (kör den M1-firmware med APP_SYSEX?)")
+            sys.exit("the FM-1 does not answer the measurement query (is it running the M1 firmware with APP_SYSEX?)")
 
         def note(ch, key, vel):
             mo.send(mido.Message("note_on" if vel else "note_off", channel=ch, note=key, velocity=vel))
@@ -46,8 +46,8 @@ def main():
         def show(label, before, now, peaks):
             diff = {k: now[k] - before[k] if k in CUMULATIVE else now[k] for k in NAMES}
             print(f"\n== {label}")
-            print(f"  CPU: medel {max(p['cpu_medel'] for p in peaks)} % (högsta medel), topp {max(p['cpu_topp'] for p in peaks)} %; "
-                  f"röster högst {max(p['röster'] for p in peaks)}, gräns lägst {min(p['röstgräns'] for p in peaks)}")
+            print(f"  CPU: average {max(p['cpu_avg'] for p in peaks)} % (highest average), peak {max(p['cpu_peak'] for p in peaks)} %; "
+                  f"voices at most {max(p['voices'] for p in peaks)}, limit lowest {min(p['voice_limit'] for p in peaks)}")
             print("  " + ", ".join(f"{k} {diff[k]}" for k in NAMES if k in CUMULATIVE))
 
         def run(label, steps):
@@ -85,12 +85,12 @@ def main():
             return st + [("wait", 1500)]
 
         def full():
-            keys = list(range(36, 76))         # 40 toner på Strings (loopad, håller): alla röster
+            keys = list(range(36, 76))         # 40 notes on Strings (looped, sustains): all voices
             st = [(mo.send, mido.Message("program_change", channel=0, program=31))]
             st += [(note, 0, k, 100) for k in keys] + [("wait", 4000)] + [(note, 0, k, 0) for k in keys]
             return st + [("wait", 800)]
 
-        def effects():                         # programmen med M1-effekter som firmware gör själv (m1_fx2.c): 8-tonsackord vardera
+        def effects():                         # the programs with M1 effects that the firmware makes itself (m1_fx2.c): an 8-note chord each
             st = []
             for prog in (14, 74, 15, 67, 23, 43, 61, 13, 20, 38):
                 st.append((mo.send, mido.Message("program_change", channel=0, program=prog)))

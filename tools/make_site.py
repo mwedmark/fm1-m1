@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""M1:s sajt (GitHub Pages): emulatorn på rotsidan och installationssidan på /install/, båda med releaseanteckningarna.
+"""The M1's site (GitHub Pages): the emulator on the root page and the install page at /install/, both with the release notes.
 
   python3 tools/make_site.py FM1_BASE_DIR APP_DIR PACKAGE.fwsc VERSION RELEASE_NOTES.md OUT_DIR
 
-OUT_DIR är webbemulatorns byggmapp (tools/build.py APP_DIR --web: fm1base/build/emu). Skriver OUT_DIR/install/index.html och
-OUT_DIR/firmware/m1-VERSION.fwsc (som fm1-d50:s tools/ci/make_install_page.py: fm1-base:s installationssida med det här bygget), stämplar båda
-sidorna med bygget (version och tid) och lägger releaseanteckningarna (docs/RELEASE-X.Y.md, Markdown) som ett avsnitt på båda.
-Paketet bär ingen Korg-data (en release byggs utan resursregion) och sidorna inte heller: användaren ger sin egen fil i webbläsaren (INSTALL.md).
-Kräver fm1-base vid den commit som release-anteckningarna nämner.
+OUT_DIR is the web emulator's build folder (tools/build.py APP_DIR --web: fm1base/build/emu). Writes OUT_DIR/install/index.html and
+OUT_DIR/firmware/m1-VERSION.fwsc (like fm1-d50's tools/ci/make_install_page.py: fm1-base's install page with this build), stamps both
+pages with the build (version and time) and adds the release notes (docs/RELEASE-X.Y.md, Markdown) as a section on both.
+The package carries no Korg data (a release is built without a resource region) and neither do the pages: the user supplies their own file in the browser (INSTALL.md).
+Requires fm1-base at the commit that the release notes name.
 """
 import datetime
 import hashlib
@@ -27,7 +27,7 @@ from build import read_conf  # noqa: E402
 REPO = "https://github.com/mwedmark/fm1-m1"
 
 
-# --------------------------------------------------------------- releaseanteckningarna som HTML ---
+# --------------------------------------------------------------- the release notes as HTML ---
 def inline(t):
     t = esc(t, quote=False)
     t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
@@ -35,7 +35,7 @@ def inline(t):
 
     def link(m):
         href = m.group(2)
-        if not re.match(r"https?://", href):                         # en relativ länk (från docs/) blir en länk till filen på GitHub
+        if not re.match(r"https?://", href):                         # a relative link (from docs/) becomes a link to the file on GitHub
             href = REPO + "/blob/main/" + re.sub(r"^(\.\./)+", "", href)
         return f'<a href="{href}" target="_blank" rel="noopener">{m.group(1)}</a>'
     return re.sub(r"\[([^\]]+)\]\(([^)]+)\)", link, t)
@@ -82,17 +82,17 @@ style = ("<style>.relnotes{max-width:760px;margin:2.5rem auto 0;padding:0 16px;f
          ".relnotes a{color:inherit}</style>\n")
 section = f'{style}<section class="relnotes" id="release-notes" aria-label="Release notes">\n{notes_html}\n</section>\n'
 
-# ---------------------------------------------------------------------------------- installationssidan ---
+# ---------------------------------------------------------------------------------- the install page ---
 conf = read_conf(app / "fm1.toml")
 raw = pkg.read_bytes()
 product = M.product_of(raw)
 prefix = conf["id_prefix"]
 if not re.fullmatch(re.escape(prefix) + r"(\d{2}|\d{6})", product):
-    raise SystemExit(f"{pkg}: identitet {product!r}, väntade {prefix} och två eller sex siffror")
+    raise SystemExit(f"{pkg}: identity {product!r}, expected {prefix} and two or six digits")
 if b"FELUCCA-LOADER-1" not in raw:
-    raise SystemExit(f"{pkg}: ingen uppdateringsladdare i paketet")
+    raise SystemExit(f"{pkg}: no update loader in the package")
 if len(raw) > 400_000:
-    raise SystemExit(f"{pkg}: {len(raw)} B: paketet har troligen en resursregion (Korg-data) i sig")
+    raise SystemExit(f"{pkg}: {len(raw)} B: the package probably has a resource region (Korg data) in it")
 name = f"m1-{re.sub(r'[^A-Za-z0-9.-]', '-', version)}.fwsc"
 for d in ("install", "firmware"):
     (out / d).mkdir(parents=True, exist_ok=True)
@@ -106,7 +106,7 @@ meta = json.dumps({"version": version, "product": product, "pkg": "../firmware/"
                    "res": None, "resPick": M.res_pick(app, conf), "boot": None})
 for mark in ("/*LIB*/", "/*META*/", "/*APP*/"):
     if html.count(mark) != 1:
-        raise SystemExit(f"web/installer.html måste innehålla {mark} en gång")
+        raise SystemExit(f"web/installer.html must contain {mark} exactly once")
 repo = conf.get("repo", REPO)
 for key, val in (("RES", conf.get("resources_what", "M1 data")), ("RES_JA", "M1 のデータ"), ("NAME", conf["name"]),
                  ("REPO", repo), ("REPO_SHORT", re.sub(r"^https?://", "", repo)), ("LICENSE", conf.get("licence", "GPL-3.0-only")),
@@ -115,17 +115,17 @@ for key, val in (("RES", conf.get("resources_what", "M1 data")), ("RES_JA", "M1 
 with open(out / "install" / "index.html", "w", encoding="utf-8", newline="\n") as f:
     f.write(html.replace("/*LIB*/", lib).replace("/*META*/", meta).replace("/*APP*/", "null"))
 
-# bygget, synligt på båda sidorna (som fm1-d50: issue #109), och releaseanteckningarna före det
+# the build, visible on both pages (as in fm1-d50: issue #109), and the release notes before it
 built = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 stamp = f'<p class="small build" id="build" style="font-size:.85rem;opacity:.7;margin:.8rem 0 0">Build {esc(version)}, {built}</p>\n'
 for page, close, notes_before in ((out / "install" / "index.html", "</footer>", '<footer>'), (out / "index.html", "</main>", "</main>")):
     text = page.read_text(encoding="utf-8")
     for need in (close, notes_before):
         if text.count(need) != 1:
-            raise SystemExit(f"{page} måste innehålla {need} en gång")
+            raise SystemExit(f"{page} must contain {need} exactly once")
     text = text.replace(notes_before, section + notes_before) if notes_before != close else text.replace(close, section + stamp + close)
     if notes_before != close:
         text = text.replace(close, stamp + close)
     with open(page, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
-print(f"installationssidan: {out / 'install' / 'index.html'} ({product}, {name}, sha256 {hashlib.sha256(raw).hexdigest()[:12]}); releaseanteckningarna på båda sidorna")
+print(f"install page: {out / 'install' / 'index.html'} ({product}, {name}, sha256 {hashlib.sha256(raw).hexdigest()[:12]}); release notes on both pages")

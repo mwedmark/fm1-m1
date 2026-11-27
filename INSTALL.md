@@ -31,7 +31,7 @@ python3 -I tools/m1_fxtable.py roms/gen/m1_patches.json roms/gen/m1_packed.fm1b 
 ```
 
 The last command writes `roms/out/m1.fm1b`: **that is your data file** (about 695 KB). The file names in `M1 files/` are those of the dumps this was made with; use yours.
-[README.md](README.md) (in Swedish) has the same steps with the details of each tool.
+[README.md](README.md) has the same steps with the details of each tool.
 
 ## Step 2a: try it in the browser
 

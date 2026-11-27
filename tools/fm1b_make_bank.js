@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// fm1-sf2:s make_bank.js med tio fält till i modulationsposten (60 byte i stället för 40), för M1:s velocity, delay, chorus och filtrets tangentföljning:
-//   offset 40: i16 velocity till nivå, M1:s VDA velocity sense -99..99 (99 = velocity i kvadrat som förut, 0 = ingen)
-//   offset 42: i16 velocity till filter-EG:ns djup, M1:s VDF EG intensity velocity sense -99..99
-//   offset 44, 46: i16 programmets delay, vänster och höger, ms (0..500); 48: i16 feedback -99..99 %
-//   offset 50: i16 bit 15 = posten har programmets effekt, bit 14 korsad feedback, bit 7..13 high damp 0..99, bit 0..6 andel 0..100
-// Omvandlaren läses ur ../fm1-sf2/index.html (orörd) och ändras här med kontrollerade textersättningar. Värdena kommer ur SF2-filen
-//   offset 52: i16 chorusens hastighet i 10 mHz (bit 0..11) och djup 0..15 (bit 12..15); 54: i16 chorusens delay i 0,1 ms
-//   offset 56: i16 filtrets tangentföljning i 0,1 cent per tangent; 58: i16 center key (MIDI-ton); 60: i16 programnummer + 1
-// i generatorerna 14, 18, 19, 20, 42, 49, 55, 59, 63 och 64, som SF2 lämnar oanvända (tools/m1_sf2.py skriver dem; nivån som sense + 100, så att
-// 0 = ingen).
+// fm1-sf2's make_bank.js with ten more fields in the modulation record (60 bytes instead of 40), for the M1's velocity, delay, chorus and filter key tracking:
+//   offset 40: i16 velocity to level, the M1's VDA velocity sense -99..99 (99 = velocity squared as before, 0 = none)
+//   offset 42: i16 velocity to the filter EG's depth, the M1's VDF EG intensity velocity sense -99..99
+//   offset 44, 46: i16 the program's delay, left and right, ms (0..500); 48: i16 feedback -99..99 %
+//   offset 50: i16 bit 15 = the record has the program's effect, bit 14 crossed feedback, bit 7..13 high damp 0..99, bit 0..6 share 0..100
+// The converter is read from ../fm1-sf2/index.html (untouched) and changed here with checked text replacements. The values come from the SF2 file
+//   offset 52: i16 the chorus's rate in 10 mHz (bit 0..11) and depth 0..15 (bit 12..15); 54: i16 the chorus's delay in 0.1 ms
+//   offset 56: i16 the filter's key tracking in 0.1 cent per key; 58: i16 center key (MIDI note); 60: i16 program number + 1
+// in generators 14, 18, 19, 20, 42, 49, 55, 59, 63 and 64, which SF2 leaves unused (tools/m1_sf2.py writes them; the level as sense + 100, so that
+// 0 = none).
 //   node tools/fm1b_make_bank.js bfp8 32000 in.sf2 out.fm1b
 const fs = require('fs'), path = require('path');
 const [format, rateArg, inArg, outArg] = process.argv.slice(2);
@@ -17,7 +17,7 @@ if (!options || !inArg || !outArg) { console.error('node tools/fm1b_make_bank.js
 const sf2dir = path.join(__dirname, '..', '..', 'fm1-sf2');
 let core = fs.readFileSync(path.join(sf2dir, 'index.html'), 'utf8').match(/<script id="core">([\s\S]*?)<\/script>/)[1].replace(/\r\n/g, '\n');
 function patch(from, to) {
-  if (core.split(from).length !== 2) { console.error('fm1-sf2:s omvandlare har ändrats, hittar inte: ' + from.slice(0, 80)); process.exit(1); }
+  if (core.split(from).length !== 2) { console.error('the fm1-sf2 converter has changed, cannot find: ' + from.slice(0, 80)); process.exit(1); }
   core = core.replace(from, to);
 }
 const EXTRA = ['velLevel', 'velFc', 'fxLeft', 'fxRight', 'fxFeedback', 'fxFlags', 'choRate', 'choDelay', 'keyFc', 'keyCenter', 'progIdx'];

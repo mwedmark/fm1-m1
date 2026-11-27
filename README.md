@@ -49,6 +49,34 @@ What fits in 696 288 B (minus the bank's tables, a few KB):
 Everything in SEA5 needs about 990 KB. About 290 KB is missing, so something has to give: a lowered `data_lo`, XDATA1, shorter tails on long
 one-shot sounds, a lower sample rate for dark samples, SEA5 for most and live cache for the rest.
 
+## The buttons
+
+The FM-1's buttons stand for the M1's keys (`fm1base/m1_keys.h`, one table). A button acts when it is **released**, as on the M1. **Held for 3 s**
+it shows its function on the LCD for a moment and does nothing when released. What the OS's own keys do was read out of the panel scan
+(docs/M1_LCD.md, "The panel scan").
+
+| FM-1 | M1 | done |
+| --- | --- | --- |
+| HOME | PROG (play) | yes: back to the play page |
+| PLAY | COMBI (play) | not yet |
+| EDIT | EDIT (program or combination) | not yet |
+| GLO | GLOBAL | yes: the Global pages (below) |
+| SEQ | SEQ | not yet |
+| ARP | the FM-1's own: Setup (voices, LCD view, colours) | yes (was EDIT) |
+| SAVE | the FM-1's own: keeps the settings | yes |
+| OCT- / OCT+ | the FM-1's own: octave for the keys | yes |
+| FX, SEL, ENV, LFO, REC | none yet | |
+
+The PRESET encoder is the M1's +1/-1 (program select; the value of the parameter on a Global page).
+
+**Global** (GLO): the pages are the OS's own, 20 of them, drawn as it draws them. SELECT turns the pages (the M1's PAGE), K1 chooses the parameter (the M1's
+eight keys under the display), PRESET changes the value (+1/-1); the cursor blinks under the parameter. SAVE keeps the values. What the firmware does with them:
+Master Tune (-50..+50 cents, for notes that start afterwards), Key Transpose (-12..+12, the keys and incoming notes), Local ON/OFF, and the MIDI filters for program
+changes and controllers. The rest are kept and shown and do nothing on the FM-1 (pedals, scale type, common channel, clock source, aftertouch, SysEx, memory
+protect). The user scale, the four drum kits and the pages for memory allocation, dump and cards are shown as pictures, without editing. Without the page
+table in the resource (above) the page shows `NO M1 DATA`. The digits, PAGE and the eight quick parameters (O F L K V A R E) have no button on the FM-1;
+SELECT and K1..K4 are free for them.
+
 ## Tools
 
 `tools/m1_rom.py`: checks IC36–IC43 (8 × 512 KB), writes CRC32/SHA-1 and merges them. The default layout `m1` is the one measured
@@ -66,6 +94,13 @@ the loop seams against the PCM and can write each multisound and drum sound as a
 
 ```powershell
 python -I tools/m1_os.py "M1 files\rev19-ic23-880219.bin" "M1 files\rev19-ic32-880319.bin" --pcm roms\gen\m1_pcm.bin --out roms\gen\m1_tables.json --wav roms\gen\ms
+```
+
+`tools/m1_lcd_emu.py`: runs the OS EPROMs (an NEC V50, so x86 plus the V20 bit instructions) in Unicorn and reads out what the OS writes to the 40 × 2 LCD,
+to build the M1's exact screens from (docs/M1_LCD.md). Needs `pip install unicorn`:
+
+```powershell
+python -I tools/m1_lcd_emu.py "M1 files\rev19-ic23-880219.bin" "M1 files\rev19-ic32-880319.bin" --json roms\gen\lcd.json
 ```
 
 ## From dump to bank (live cache)
@@ -91,7 +126,18 @@ node ..\fm1-sf2\pack_bank.js roms\gen\m1_bfp8.fm1b roms\out\m1.fm1b --kbit 64 --
 ```
 
 ```powershell
-python -I tools/m1_fxtable.py roms\gen\m1_patches.json roms\gen\m1_packed.fm1b roms\out\m1.fm1b
+python -I tools/m1_fxtable.py roms\gen\m1_patches.json roms\gen\m1_packed.fm1b roms\out\m1_fx.fm1b
+```
+
+The M1's Global pages (texts, parameters and values) are read out of the OS of your own M1, in the emulator, into a table that goes last in the resource
+region (about 3 KB, ~30 s; docs/M1_LCD.md):
+
+```powershell
+python -I tools/m1_pages.py "M1 files\rev19-ic23-880219.bin" "M1 files\rev19-ic32-880319.bin" roms\gen\m1_pages.bin
+```
+
+```powershell
+python -I tools/m1_pages.py --append roms\gen\m1_pages.bin roms\out\m1_fx.fm1b roms\out\m1.fm1b
 ```
 
 `tools/fm1b_make_bank.js` is fm1-sf2's `make_bank.js` with the M1's velocity in the modulation record (44 bytes); it reads the

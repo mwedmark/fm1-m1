@@ -102,6 +102,8 @@ void fm1b_note(const void *owner, unsigned note, unsigned velocity, unsigned lev
 void fm1b_drum_note(const void *owner, unsigned note, unsigned velocity, unsigned level);
 unsigned fm1b_has_drums(void);
 void fm1b_panic(void);
+/* fm1-m1: the M1's Master Tune, -100..100 cents, for the notes that start after the call (0 by default). Main loop. */
+void fm1b_master_tune(int cents);
 /* Free places in the queue the calls above and below write to (32 in all; the audio interrupt empties it every block). A
  * caller that sends many events at once (the MIDI file player, song.c) keeps under it: a full queue loses the event. */
 unsigned fm1b_queue_room(void);

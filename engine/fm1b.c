@@ -160,6 +160,7 @@ static uint16_t channel_scale[CHANNEL_SLOTS];
  * depth), the sustain pedal, the RPN selected with CC 101/100, and what the panel's channel page shows. All zero while a
  * channel never gets these messages, and then nothing in the audio path looks at them but one test per envelope step. */
 static int16_t channel_bend[CHANNEL_SLOTS], channel_cents[CHANNEL_SLOTS];
+static volatile int16_t master_cents;               /* fm1-m1: the M1's Master Tune, -50..50 cents on every voice (fm1b_master_tune) */
 static uint8_t channel_bend_semis[CHANNEL_SLOTS], channel_bend_extra[CHANNEL_SLOTS];
 static uint8_t channel_mod[CHANNEL_SLOTS], channel_pedal[CHANNEL_SLOTS], channel_program[CHANNEL_SLOTS], channel_notes[CHANNEL_SLOTS];
 static uint16_t channel_rpn[CHANNEL_SLOTS];
@@ -796,6 +797,13 @@ FM1_DSP_CODE unsigned fm1b_ready(void)
 {
     return bank.image && bank.preset >= 0;
 }
+/* fm1-m1: the M1's Master Tune. Notes that start after it play that many cents (-100..100) off; a note that sounds keeps its pitch. A 16-bit
+ * store from the main loop: the audio interrupt reads it. */
+void fm1b_master_tune(int cents)
+{
+    master_cents = (int16_t)(cents < -100 ? -100 : cents > 100 ? 100 : cents);
+}
+
 void fm1b_panic(void)
 {
     for (unsigned i = 0; i < FM1B_VOICES; ++i)
@@ -861,7 +869,7 @@ static inline __attribute__((always_inline)) int32_t triangle(uint32_t phase)
  * depth), and its zone's LFOs. A voice without any of them plays base_step untouched. */
 static FM1_DSP_CODE void retune(struct voice *v)
 {
-    int32_t cents = channel_cents[v->channel] + v->lfo_cents;
+    int32_t cents = channel_cents[v->channel] + master_cents + v->lfo_cents;
     unsigned mod = channel_mod[v->channel];
     if (mod) {
         int32_t tri = v->lfo < 32768U ? (int32_t)v->lfo : 65535 - (int32_t)v->lfo;   /* 0..32767 */
@@ -1282,7 +1290,7 @@ static FM1_DSP_CODE __attribute__((noinline)) void zone_start(const void *owner,
     zone_pan = zone_pan < -500 ? -500 : zone_pan > 500 ? 500 : zone_pan;
     v->zone_pan = (int8_t)((zone_pan * 64 + (zone_pan < 0 ? -250 : 250)) / 500);
     voice_pan(v);
-    if (channel_cents[channel] || channel_mod[channel])
+    if (channel_cents[channel] || channel_mod[channel] || master_cents)
         retune(v);
     /* The zone's modulation record (FORMAT.md, "Modulation"): its LFOs, and how the key number scales hold and decay. */
     const uint8_t *mod = NULL;

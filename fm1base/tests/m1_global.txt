@@ -1,0 +1,48 @@
+# the Global pages (m1_pages.h): GLO, SELECT turns the pages, K1 the parameter, PRESET the value. Needs the page table in roms/out/m1.fm1b (tools/m1_pages.py).
+wait 400
+tap GLO
+wait 300
+shot global_0.png
+turn PRESET 5
+wait 300
+shot global_0_tune5.png
+turn SELECT 1
+turn PRESET 3
+wait 300
+shot global_1_transpose3.png
+turn SELECT 2
+wait 300
+shot global_3_pedal.png
+turn K1 1
+turn PRESET 2
+wait 300
+shot global_3_pedal2.png
+turn SELECT 7
+wait 300
+shot global_10_midi.png
+turn K1 2
+turn PRESET -1
+wait 300
+shot global_10_local.png
+turn SELECT 1
+turn K1 3
+turn PRESET -1
+wait 300
+shot global_11_filter.png
+tap SAVE
+wait 300
+tap HOME
+wait 300
+shot global_home.png
+# the values survive a restart (SAVE kept them)
+reboot
+wait 600
+tap GLO
+wait 300
+shot global_after_reboot.png
+turn SELECT -20
+wait 300
+shot global_after_reboot_0.png
+turn SELECT 10
+wait 300
+shot global_after_reboot_10.png

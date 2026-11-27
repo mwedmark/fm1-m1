@@ -10,6 +10,7 @@
 #include "m1_fx2.h"
 #include "m1_setup.h"                          /* FM-1 Setup: non-standard settings, kept apart from the M1's menus */
 #include "m1_lcd.h"                            /* the M1's 40 x 2 LCD: two views, three colour schemes */
+#include "m1_keys.h"                           /* the FM-1's buttons as the M1's keys, and the help on a long press */
 
 const int16_t *m1_sea5_dqt(void);               /* m1_unit.c */
 
@@ -236,8 +237,12 @@ static struct {
     char msg[2][24];
     uint32_t msg_until, keys, btn;
     uint8_t redraw;
-    uint8_t page;                                /* 0 the play page, 1 FM-1 Setup (EDIT toggles) */
+    uint8_t page;                                /* 0 the play page, 1 FM-1 Setup (ARP toggles) */
     uint8_t field;                               /* the Setup page's field */
+    uint32_t down_ms[NB];                        /* when each button went down */
+    uint32_t helped;                             /* bit B_*: held long enough, its help has been shown (its release does nothing) */
+    char ovl[2][40];                             /* a notice drawn on the LCD in place of the page: a button's help, or "not done yet" */
+    uint32_t ovl_until;
 } ui;
 
 void app_say(const char *a, const char *b)
@@ -253,6 +258,50 @@ void app_say(const char *a, const char *b)
     ui.redraw = 1;
     if (ann_on())
         ann_say(ui.msg[0], 0, ANN_NOW);
+}
+
+/* what a button does, called on its release */
+static void key_action(uint32_t k)
+{
+    switch (m1_keymap[k].fn) {
+    case M1K_PROG:                               /* back to the play page, out of the Setup page */
+        ui.page = 0;
+        ui.ovl_until = 0;
+        ui.redraw = 1;
+        break;
+    case M1K_SETUP:                              /* FM-1 Setup (like fm1-d50's Setup page): in and out */
+        ui.page = ui.page ? 0u : 1u;
+        ui.field = 0;
+        ui.redraw = 1;
+        break;
+    case M1K_SAVE:
+        if (plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0) {
+            set_dirty = 0;
+            app_say("SAVED", "");
+        } else {
+            app_say("SAVE", "FAILED");
+        }
+        break;
+    case M1K_OCTDN:
+    case M1K_OCTUP:
+        if (bank_ok) {
+            int32_t o = clamp(set.octave + (m1_keymap[k].fn == M1K_OCTUP ? 1 : -1), -3, 3);
+            if (o != set.octave) {
+                fm1b_panic();                    /* a held key would otherwise not find its note off */
+                set.octave = (int8_t)o;
+                set_dirty = 1;
+                ui.redraw = 1;
+            }
+        }
+        break;
+    case M1K_NONE:
+        break;
+    default:                                     /* COMBI, EDIT, GLOBAL, SEQ: the M1's own pages are not in the firmware yet */
+        m1_keys_notyet(k, ui.ovl);
+        ui.ovl_until = (plat_ms() + 1300u) | 1u;
+        ui.redraw = 1;
+        break;
+    }
 }
 
 static void input(void)
@@ -277,29 +326,21 @@ static void input(void)
             plat_midi_send(0x08u | 0x80u << 8 | note << 16, TO_USB);
         }
     }
-    for (k = 0; k < NB; k++) {
-        uint32_t bit = 1u << k;
-        if (!(btn & bit) || (ui.btn & bit))
-            continue;
-        if ((k == B_OCTDN || k == B_OCTUP) && bank_ok) {
-            int32_t o = clamp(set.octave + (k == B_OCTUP ? 1 : -1), -3, 3);
-            if (o != set.octave) {
-                fm1b_panic();                    /* a held key would otherwise not find its note off */
-                set.octave = (int8_t)o;
-                set_dirty = 1;
-                ui.redraw = 1;
-            }
-        } else if (k == B_EDIT) {                /* FM-1 Setup (like fm1-d50's Setup page): EDIT in and out */
-            ui.page = ui.page ? 0u : 1u;
-            ui.field = 0;
+    for (k = 0; k < NB; k++) {                   /* a button acts when it is released (as on the M1); held M1_HELP_MS it shows its function instead */
+        uint32_t bit = 1u << k, now = plat_ms();
+        if ((btn & bit) && !(ui.btn & bit)) {
+            ui.down_ms[k] = now;
+            ui.helped &= ~bit;
+        } else if ((btn & bit) && !(ui.helped & bit) && now - ui.down_ms[k] >= M1_HELP_MS) {
+            ui.helped |= bit;
+            m1_keys_help(k, ui.ovl);
+            ui.ovl_until = (now + M1_HELP_SHOW_MS) | 1u;
             ui.redraw = 1;
-        } else if (k == B_SAVE) {
-            if (plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0) {
-                set_dirty = 0;
-                app_say("SAVED", "");
-            } else {
-                app_say("SAVE", "FAILED");
-            }
+        } else if (!(btn & bit) && (ui.btn & bit)) {
+            if (ui.helped & bit)
+                ui.helped &= ~bit;               /* it was held for the help: no action */
+            else
+                key_action(k);
         }
     }
     if (ui.page) {                               /* the Setup page: K1 moves the field, K2 changes the value */
@@ -337,7 +378,7 @@ static void m1_setup_draw(const struct fm1b_status *st, unsigned avg)
     cv_text(10, 6, &FONT_B, "FM-1 SETUP", C_WHITE);
     for (i = 0; i < M1_SETUP_FIELDS; i++) {
         const char *n = m1_setup_fields[i].name;
-        uint32_t k = 0;
+        k = 0;
         for (; n[k] && k < 10u; k++)
             t[k] = n[k];
         t[k] = 0;
@@ -377,13 +418,21 @@ static void draw(void)
     }
     if (ui.page) {
         m1_setup_draw(&st, avg);
+        if (now < ui.ovl_until) {                /* a button's help over the Setup page's foot */
+            cv_begin(240, 100, C_BLACK);
+            m1_lcd_draw((uint32_t)m1_setup_get(set.setup, M1_SETUP_VIEW), (uint32_t)m1_setup_get(set.setup, M1_SETUP_COLOR), ui.ovl, 4);
+            cv_blit(0, 140);
+        }
         return;
     }
     /* the canvas holds 240 x 144 (gfx.c APP_CANVAS_PX): two strips. The first one is the M1's LCD (m1_lcd.h), in the view and colours of the Setup page */
     {
         char row[2][40];
         uint32_t view = (uint32_t)m1_setup_get(set.setup, M1_SETUP_VIEW), col = (uint32_t)m1_setup_get(set.setup, M1_SETUP_COLOR);
-        m1_lcd_prog_page(row, set.program, bank_ok ? st.name : 0, bank_ok);
+        if (now < ui.ovl_until)
+            memcpy(row, ui.ovl, sizeof row);     /* a button's help, or "not done yet", in place of the page */
+        else
+            m1_lcd_prog_page(row, set.program, bank_ok ? st.name : 0, bank_ok);
         cv_begin(240, 140, C_BLACK);
         m1_lcd_draw(view, col, row, view == M1_VIEW_2X20 ? 24 : 60);
         cv_blit(0, 0);
@@ -434,6 +483,10 @@ void app_frame(void)
     ann_tick(now);
     if (ui.msg_until && now >= ui.msg_until) {
         ui.msg_until = 0;
+        ui.redraw = 1;
+    }
+    if (ui.ovl_until && (int32_t)(now - ui.ovl_until) >= 0) {
+        ui.ovl_until = 0;
         ui.redraw = 1;
     }
     if (bank_ok && now - last_draw > 250u)       /* voices and CPU */

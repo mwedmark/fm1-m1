@@ -1,33 +1,33 @@
 # the LCD views and colour schemes: every combination as a screenshot (fm1base/build/test). Without a bank the glass shows NO M1 DATA.
 wait 400
 shot lcd_green_m1.png
-tap EDIT
+tap ARP
 turn K1 1
 turn K2 1
-tap EDIT
+tap ARP
 wait 400
 shot lcd_green_2x20.png
-tap EDIT
+tap ARP
 turn K1 2
 turn K2 1
-tap EDIT
+tap ARP
 wait 400
 shot lcd_blue_2x20.png
-tap EDIT
+tap ARP
 turn K1 1
 turn K2 -1
-tap EDIT
+tap ARP
 wait 400
 shot lcd_blue_m1.png
-tap EDIT
+tap ARP
 turn K1 2
 turn K2 1
-tap EDIT
+tap ARP
 wait 400
 shot lcd_amber_m1.png
-tap EDIT
+tap ARP
 turn K1 1
 turn K2 1
-tap EDIT
+tap ARP
 wait 400
 shot lcd_amber_2x20.png

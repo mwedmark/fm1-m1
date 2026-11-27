@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Läser användarens egna Korg M1-PCM-dumpar (IC36..IC43, 8 x 512 KB), kontrollerar storlek,
-skriver CRC32/SHA-1 och gissar hur chipen ska slås ihop till en 4 MB-bild.
+"""Reads the user's own Korg M1 PCM dumps (IC36..IC43, 8 x 512 KB), checks the size,
+writes CRC32/SHA-1 and guesses how the chips should be merged into a 4 MB image.
 
-Innehåller ingen Korg-data. Kör med `python -I tools/m1_rom.py <mapp>` (-I: inga moduler från
-dumpens mapp laddas).
+Contains no Korg data. Run with `python -I tools/m1_rom.py <folder>` (-I: no modules from
+the dump's folder are loaded).
 
-  python -I tools/m1_rom.py DUMPMAPP                 # visa filer, checksummor, layoutgissning
-  python -I tools/m1_rom.py DUMPMAPP --layout pairs16 --out m1_pcm.bin
-  python -I tools/m1_rom.py DUMPMAPP --expect kanda.json  # jämför mot CRC32:or du själv fört in
+  python -I tools/m1_rom.py DUMPFOLDER                 # show files, checksums, layout guess
+  python -I tools/m1_rom.py DUMPFOLDER --layout pairs16 --out m1_pcm.bin
+  python -I tools/m1_rom.py DUMPFOLDER --expect known.json  # compare against CRC32s you entered yourself
 
-Layouter:
-  m1              uppmätt: (IC40,IC36) (IC41,IC37) (IC42,IC38) (IC43,IC39), hög byte | låg-chipets övre halvbyte,
-                  ut som int16 LE (12 bitar), 2 097 152 sampel. Standard för --out.
+Layouts:
+  m1              measured: (IC40,IC36) (IC41,IC37) (IC42,IC38) (IC43,IC39), high byte | the low chip's upper nibble,
+                  out as int16 LE (12 bits), 2 097 152 samples. The default for --out.
   concat          IC36 | IC37 | ... | IC43
-  pairs16         (IC36,IC37) bytevis interfolierade som (låg,hög), sedan (IC38,IC39) ...
-  pairs16-swap    som pairs16 men (hög,låg)
+  pairs16         (IC36,IC37) interleaved byte by byte as (low,high), then (IC38,IC39) ...
+  pairs16-swap    like pairs16 but (high,low)
 """
 import argparse, hashlib, json, os, re, sys, zlib
 
@@ -33,7 +33,7 @@ def find_chips(folder):
         key = m.group(1) if m else None
         if key in CHIPS:
             if key in found:
-                sys.exit(f"Två filer för {key.upper()}: {found[key]} och {path}")
+                sys.exit(f"Two files for {key.upper()}: {found[key]} and {path}")
             found[key] = path
         else:
             other.append((key, path))
@@ -46,8 +46,8 @@ def crc32(data):
 
 def merge(chips, layout):
     if layout == "m1":
-        # uppmätt 2026-11-25 på korgm1p1: IC40..43 är de höga 8 bitarna (med tecken), låg-chipet IC36..39 med samma
-        # index ger 4 bitar till i sin övre halvbyte. Sampel = hög << 8 | (låg & 0xF0) som int16 LE: 12 bitar, 2M sampel.
+        # measured 2026-11-25 on korgm1p1: IC40..43 are the high 8 bits (signed), the low chip IC36..39 with the same
+        # index gives 4 more bits in its upper nibble. Sample = high << 8 | (low & 0xF0) as int16 LE: 12 bits, 2M samples.
         out = bytearray()
         for i in range(4):
             hi, lo = chips[CHIPS[4 + i]], chips[CHIPS[i]]
@@ -71,7 +71,7 @@ def merge(chips, layout):
 
 
 def roughness(values):
-    """Medel |x[n]-x[n-1]| delat med medel |x - medel|. Ljud: klart under 1. Brus/fel ordning: ~1.1-1.4."""
+    """Mean |x[n]-x[n-1]| divided by mean |x - mean|. Sound: clearly under 1. Noise/wrong order: ~1.1-1.4."""
     n = len(values)
     if n < 3:
         return 9.0
@@ -97,12 +97,12 @@ def decode(buf, fmt):
 
 
 def score(image, fmt, probes=64, span=4096):
-    """Median-roughness över utspridda prov som inte är tysta/fyllda."""
+    """Median roughness over spread-out probes that are not silent/filled."""
     results = []
     step = max(1, (len(image) - span) // probes)
     for off in range(0, len(image) - span, step):
         win = image[off:off + span]
-        if win.count(win[0]) > span * 0.9:   # tyst eller 0xFF-fyllt
+        if win.count(win[0]) > span * 0.9:   # silent or 0xFF-filled
             continue
         results.append(roughness(decode(win, fmt)))
     if not results:
@@ -116,7 +116,7 @@ def main():
     ap.add_argument("folder")
     ap.add_argument("--layout", choices=LAYOUTS)
     ap.add_argument("--out")
-    ap.add_argument("--expect", help="JSON {\"ic36\": \"crc32 i hex\", ..., \"merged\": \"...\"}")
+    ap.add_argument("--expect", help="JSON {\"ic36\": \"crc32 in hex\", ..., \"merged\": \"...\"}")
     args = ap.parse_args()
 
     found, other = find_chips(args.folder)
@@ -124,14 +124,14 @@ def main():
         size = os.path.getsize(path)
         note = ""
         if key and key.startswith("u2"):
-            note = "  <- Plus1-modifierad PCM, inte original-M1; används inte"
+            note = "  <- Plus1-modified PCM, not an original M1; not used"
         elif key and key.startswith("plus1"):
-            note = "  <- Plus1-modifierat OS/kort; används inte"
-        print(f"  (hoppar över) {os.path.basename(path)}  {size} B{note}")
+            note = "  <- Plus1-modified OS/card; not used"
+        print(f"  (skipping) {os.path.basename(path)}  {size} B{note}")
 
     missing = [k.upper() for k in CHIPS if k not in found]
     if missing:
-        sys.exit("Saknas: " + ", ".join(missing))
+        sys.exit("Missing: " + ", ".join(missing))
 
     expect = {}
     if args.expect:
@@ -145,17 +145,17 @@ def main():
         c = f"{crc32(data):08x}"
         mark = ""
         if len(data) != CHIP:
-            mark, bad = f"  FEL STORLEK (väntat {CHIP})", True
+            mark, bad = f"  WRONG SIZE (expected {CHIP})", True
         if k in expect:
             ok = expect[k] == c
-            mark += "  stämmer" if ok else f"  AVVIKER (väntat {expect[k]})"
+            mark += "  matches" if ok else f"  DIFFERS (expected {expect[k]})"
             bad |= not ok
         print(f"{k.upper():6} {len(data):8}  {c}  {hashlib.sha1(data).hexdigest()}{mark}")
         chips[k] = data
     if bad:
-        sys.exit("Kontrollen misslyckades.")
+        sys.exit("The check failed.")
 
-    print("\nLayoutgissning (lägre = mer ljudlikt; ljud brukar ligga under ~0.6):")
+    print("\nLayout guess (lower = more sound-like; sound is usually under ~0.6):")
     best = None
     for layout in LAYOUTS:
         img = merge(chips, layout)
@@ -167,20 +167,20 @@ def main():
             if best is None or s < best[0]:
                 best = (s, layout, fmt)
     if best:
-        print(f"Bäst: {best[1]} som {best[2]} ({best[0]:.3f}). Det är en gissning, inte en verifiering.")
+        print(f"Best: {best[1]} as {best[2]} ({best[0]:.3f}). It is a guess, not a verification.")
 
     if args.out:
         layout = args.layout or "m1"
         if not layout:
-            sys.exit("Ange --layout.")
+            sys.exit("Give --layout.")
         img = merge(chips, layout)
         with open(args.out, "wb") as f:
             f.write(img)
         c = f"{crc32(img):08x}"
         mark = ""
         if "merged" in expect:
-            mark = "  stämmer" if expect["merged"] == c else f"  AVVIKER (väntat {expect['merged']})"
-        print(f"\nSkrev {args.out}: {len(img)} B, layout {layout}, CRC32 {c}{mark}")
+            mark = "  matches" if expect["merged"] == c else f"  DIFFERS (expected {expect['merged']})"
+        print(f"\nWrote {args.out}: {len(img)} B, layout {layout}, CRC32 {c}{mark}")
 
 
 if __name__ == "__main__":

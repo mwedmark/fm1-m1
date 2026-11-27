@@ -1,4 +1,4 @@
-# Universe (0), Brass 1 (2), Symphonic (7): håll ett ackord 2 s vardera
+# Universe (0), Brass 1 (2), Symphonic (7): hold a chord for 2 s each
 wait 300
 wav m1_fix.wav
 midi C0 00 00

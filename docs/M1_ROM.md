@@ -1,97 +1,97 @@
-# Korg M1: PCM och OS-tabeller, uppmätt (2026-11-25)
+# Korg M1: PCM and OS tables, measured (2026-11-25)
 
-Allt här är uppmätt på användarens egna dumpar (`M1 files/`, utanför git) med `tools/m1_rom.py` och `tools/m1_os.py`. Inget är
-hämtat från Korgs kod eller dokumentation. Det som är osäkert står som det.
+Everything here is measured on the user's own dumps (`M1 files/`, outside git) with `tools/m1_rom.py` and `tools/m1_os.py`. Nothing is
+taken from Korg's code or documentation. What is uncertain is marked as such.
 
 ## PCM (IC36–IC43, 8 × 512 KB)
 
-- **Sampel**: 12 bitar = hög-chipets byte (med tecken) << 4 | låg-chipets övre halvbyte. Paren är (IC40,IC36), (IC41,IC37),
-  (IC42,IC38), (IC43,IC39), i den ordningen och i följd: sampel *k* i paret är byte *k* i båda chipen.
-  `m1_rom.py --out` skriver alla 2 097 152 sampel som int16 LE (`<< 4` till: hög << 8 | låg & 0xF0).
-- Låg-chipens nedre halvbyte förbättrar inget sampel. I IC36 är den 0 i 86 % av bytena. Vad den bär är okänt.
-- **Samplingsfrekvens: 31 250 Hz.** Uppmätt på loopar med harmonisk ton (Bottles, Choir, Pan Flute, Voices): 31,1–31,3 kHz
-  med zonernas fininställning.
-- **Två banker à 1M sampel**, bank 0 = IC40/41 + IC36/37, bank 1 = IC42/43 + IC38/39. Adresserna i sampelposterna är 20 bitar
-  och bit 20 i slutadressen väljer bank. PCM:en är en följd över båda: bank 0 slutar mitt i Strings (zon 2), och Strings zon 3
-  till Lore, slagljuden och trummorna ligger i bank 1 (0x000002..0xFEC85). Looparna är sömlösa i båda bankerna med den
-  tolkningen (median 0,16 och 0,23 av ett normalsteg). Tubular 1–4 och Bell Ring bland trumljuden ligger i bank 0.
-- OS v1.9 använder hela bank 0 och bank 1 upp till 0xFEC85.
+- **Samples**: 12 bits = the high chip's byte (signed) << 4 | the low chip's upper nibble. The pairs are (IC40,IC36), (IC41,IC37),
+  (IC42,IC38), (IC43,IC39), in that order and in sequence: sample *k* in the pair is byte *k* in both chips.
+  `m1_rom.py --out` writes all 2 097 152 samples as int16 LE (`<< 4` more: high << 8 | low & 0xF0).
+- The low chip's lower nibble does not improve any sample. In IC36 it is 0 in 86 % of the bytes. What it carries is unknown.
+- **Sample rate: 31 250 Hz.** Measured on loops with a harmonic tone (Bottles, Choir, Pan Flute, Voices): 31.1–31.3 kHz
+  with the zones' fine tuning.
+- **Two banks of 1M samples each**, bank 0 = IC40/41 + IC36/37, bank 1 = IC42/43 + IC38/39. The addresses in the sample records are 20 bits
+  and bit 20 in the end address selects the bank. The PCM is one sequence across both: bank 0 ends in the middle of Strings (zone 2), and Strings zone 3
+  through Lore, the percussive sounds and the drums are in bank 1 (0x000002..0xFEC85). The loops are seamless in both banks with that
+  interpretation (median 0.16 and 0.23 of a normal step). Tubular 1–4 and Bell Ring among the drum sounds are in bank 0.
+- OS v1.9 uses all of bank 0 and bank 1 up to 0xFEC85.
 
-## OS-EPROM (IC23 hög, IC32 låg, 2 × 64 KB)
+## OS EPROM (IC23 high, IC32 low, 2 × 64 KB)
 
-Bilden är 128 KB med låg-chipet på jämna adresser. `m1_os.py` hittar tabellerna på det första namnet ("Piano"), inte på fasta
-adresser. I v1.9 (rev19) och M1R ligger de i ett segment med bas 0x175C0 i bilden. Pekarna nedan är offset i det segmentet.
+The image is 128 KB with the low chip at even addresses. `m1_os.py` finds the tables by the first name ("Piano"), not at fixed
+addresses. In v1.9 (rev19) and the M1R they are in a segment with base 0x175C0 in the image. The pointers below are offsets in that segment.
 
-### Multisounds: 100 poster à 14 byte (bild 0x1DF38)
+### Multisounds: 100 records of 14 bytes (image 0x1DF38)
 
-| byte | fält |
+| byte | field |
 | --- | --- |
-| 0–1 | u16 pekare till den första zonen |
-| 2 | typ: 0 PCM, 2 DWGS |
-| 3 | antal zoner |
-| 4–13 | namn, 10 tecken |
+| 0–1 | u16 pointer to the first zone |
+| 2 | type: 0 PCM, 2 DWGS |
+| 3 | number of zones |
+| 4–13 | name, 10 characters |
 
-Index 0–76 är PCM och 77–99 DWGS (DWGS E.P.1 .. DWGS Sine). Zontabellen slutar där namntabellen börjar.
+Index 0–76 are PCM and 77–99 DWGS (DWGS E.P.1 .. DWGS Sine). The zone table ends where the name table begins.
 
-### Zoner: 10 byte (0x5E06..0x6978, 293 st)
+### Zones: 10 bytes (0x5E06..0x6978, 293 of them)
 
-| byte | fält |
+| byte | field |
 | --- | --- |
-| 0–1 | u16 pekare till sampelposten |
-| 2 | översta tangent (MIDI) |
-| 3 | alltid 5 (okänt) |
-| 4 | fininställning i cent, med tecken: läggs till vid uppspelning |
-| 5 | rotnot (MIDI) |
-| 6 | med tecken, oftast 0 (DWGS −15): troligen nivå (inte verifierat) |
-| 7 | med tecken, oftast 0: troligen filter eller nivå (inte verifierat) |
+| 0–1 | u16 pointer to the sample record |
+| 2 | top key (MIDI) |
+| 3 | always 5 (unknown) |
+| 4 | fine tuning in cents, signed: added on playback |
+| 5 | root note (MIDI) |
+| 6 | signed, usually 0 (DWGS −15): probably level (not verified) |
+| 7 | signed, usually 0: probably filter or level (not verified) |
 | 8–9 | 0 |
 
-Den lägsta zonen kan vara en platshållare (Strings: översta tangent 0).
+The lowest zone can be a placeholder (Strings: top key 0).
 
-### Sampelposter: 14 byte (0x4C78..0x5E06, 321 st)
+### Sample records: 14 bytes (0x4C78..0x5E06, 321 of them)
 
-| byte | fält |
+| byte | field |
 | --- | --- |
 | 0–1 | 0 |
-| 2–5 | start (bit 0–19) |
-| 6–9 | loopstart (bit 0–19), bit 26 (0x04 i byte 9) = loopar; utan den är ljudet ett engångsljud |
-| 10–13 | slut, exklusivt (bit 0–19), bit 20 = bank |
+| 2–5 | start (bits 0–19) |
+| 6–9 | loop start (bits 0–19), bit 26 (0x04 in byte 9) = loops; without it the sound is a one-shot |
+| 10–13 | end, exclusive (bits 0–19), bit 20 = bank |
 
-Loopen är [loopstart, slut): efter sampel slut−1 kommer loopstart. Loopstart kan ligga före start: 2 sampel före när hela
-samplet loopas (Choir, Voices, Lore), en hel cykel före i DWGS (start mitt i cykeln) och ett längre stycke i Rhythm.
+The loop is [loop start, end): after sample end−1 comes loop start. Loop start can lie before start: 2 samples before when the whole
+sample loops (Choir, Voices, Lore), a whole cycle before in DWGS (start in the middle of the cycle) and a longer stretch in Rhythm.
 
 ### DWGS
 
-De 23 DWGS-multisounds delar 8 zoner och sampelposterna 0–7. Våg *k* (multisound 77 + *k*) ligger i bank 0 från *k* × 0x3FC,
-och posterna är platser inom det blocket: en och samma cykel i 512, 256, 128, 64, 32, 16, 8 och 4 sampel (summa 0x3FC), en per
-zon. Våg 23 slutar där Piano börjar (0x5BA6).
+The 23 DWGS multisounds share 8 zones and sample records 0–7. Wave *k* (multisound 77 + *k*) is in bank 0 from *k* × 0x3FC,
+and the records are positions within that block: one and the same cycle in 512, 256, 128, 64, 32, 16, 8 and 4 samples (sum 0x3FC), one per
+zone. Wave 23 ends where Piano begins (0x5BA6).
 
-### Trumljud: 44 namn à 11 byte (bild 0x1E508), pekare till dem vid 0x1E4B2
+### Drum sounds: 44 names of 11 bytes (image 0x1E508), pointers to them at 0x1E4B2
 
-Ljud *n* (Kick 1 .. Metronome2) spelar sampelpost 277 + *n*. Det är de 44 poster i följd som ingen zon använder, och de läser
-bank 1. Trumkittarnas tangenter, stämning och nivå ligger i globaldatan (nedan, "Programdata").
+Sound *n* (Kick 1 .. Metronome2) plays sample record 277 + *n*. They are the 44 consecutive records that no zone uses, and they read
+bank 1. The drum kits' keys, tuning and level are in the global data (below, "Program data").
 
-## Programdata (SysEx)
+## Program data (SysEx)
 
-Formatet står i M1 Owner's Manual, "MIDI Exclusive Format" och tabell 1–6 (s. 124–131). `tools/m1_syx.py` avkodar en dump.
-Fabriksdatan är användarens egen dump `M1 files/MPC-00/Int_M1.syx` (utanför git): tre meddelanden, `F0 42 3n 19 func 0m data F7`
-där byte 5 är minnesallokering och bank, och datan är Korgs 7-bitarspackning (en byte med de sju följandes bit 7, sedan de sju).
+The format is in the M1 Owner's Manual, "MIDI Exclusive Format" and tables 1–6 (p. 124–131). `tools/m1_syx.py` decodes a dump.
+The factory data is the user's own dump `M1 files/MPC-00/Int_M1.syx` (outside git): three messages, `F0 42 3n 19 func 0m data F7`
+where byte 5 is memory allocation and bank, and the data is Korg's 7-bit packing (one byte with the bit 7 of the following seven, then the seven).
 
-| func | innehåll | storlek |
+| func | contents | size |
 | --- | --- | --- |
-| 4C | alla program | 100 × 143 byte |
-| 4D | alla kombinationer | 100 × 124 byte |
-| 51 | globaldata: stämning, skalor, 4 trumkittar à 30 tangenter (7 byte: trumljud 1–44, tangent, pan, stämning, nivå, decay) | 861 byte |
+| 4C | all programs | 100 × 143 bytes |
+| 4D | all combinations | 100 × 124 bytes |
+| 51 | global data: tuning, scales, 4 drum kits of 30 keys each (7 bytes: drum sound 1–44, key, pan, tuning, level, decay) | 861 bytes |
 
-Ett program (tabell 1): namn (0–9), läge Single/Double/Drum (10), mono/hold (11), OSC 1 och 2 multisound och oktav (12–15),
-intervall, detune, delay start (16–18), pitch MG och VDF MG (19–26), aftertouch (27–31), joystick (32–37), effekter (38–62), och per
-oscillator (63–102 för OSC 1, samma för OSC 2 från 103): pitch-EG, VDF (cutoff, tangentföljning, EG-intensitet), VDF-EG med åtta
-parametrar, VDA (nivå, tangentföljning, velocity) och VDA-EG med sju. Värden med tecken är tvåkomplement i en byte.
+A program (table 1): name (0–9), mode Single/Double/Drum (10), mono/hold (11), OSC 1 and 2 multisound and octave (12–15),
+interval, detune, delay start (16–18), pitch MG and VDF MG (19–26), aftertouch (27–31), joystick (32–37), effects (38–62), and per
+oscillator (63–102 for OSC 1, the same for OSC 2 from 103): pitch EG, VDF (cutoff, key tracking, EG intensity), VDF EG with eight
+parameters, VDA (level, key tracking, velocity) and VDA EG with seven. Signed values are two's complement in one byte.
 
-Kontroll mot dumpen: 70 Single-, 27 Double- och 3 Drum-program, alla multisounds interna (0–99). Universe = Choir + Lore,
-Piano 16' = Piano, Ooh/Ahh = Voices + Choir, BottleBell = Bottles + Bell. Trumkitt 1 börjar med Kick 1 på tangent 24.
+Check against the dump: 70 Single, 27 Double and 3 Drum programs, all multisounds internal (0–99). Universe = Choir + Lore,
+Piano 16' = Piano, Ooh/Ahh = Voices + Choir, BottleBell = Bottles + Bell. Drum kit 1 begins with Kick 1 on key 24.
 
-## Inte klart
+## Not finished
 
-- Zonbytes 3, 6 och 7.
-- Låg-chipens nedre halvbytar.
+- Zone bytes 3, 6 and 7.
+- The low chips' lower nibbles.

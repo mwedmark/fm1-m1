@@ -1,4 +1,4 @@
-# Första röktestet: banken binds, ett ackord låter, PRESET byter program
+# First smoke test: the bank binds, a chord sounds, PRESET changes the program
 wait 300
 shot boot.png
 wav chord.wav

@@ -1,4 +1,4 @@
-# Korgs ROM:ar och dumpar: aldrig i repot
+# Korg's ROMs and dumps: never in the repo
 roms/
 *.rom
 *.syx
@@ -8,13 +8,13 @@ dist/
 __pycache__/
 node_modules/
 
-# Användarens egna M1-dumpar
+# The user's own M1 dumps
 M1 files/
 fm1base/build/
 fm1base/web/words/
 emu/
 
-# Utvecklingsmiljön, och ett första utkast till en egen motor som inte används (README.md)
+# The development environment, and a first draft of an engine of our own that is not used (README.md)
 .claude/
 src/
 include/

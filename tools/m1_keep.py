@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Skriver --keep-listan till pack_bank.js: de ljud i en opackad (BFP8) bank som har en kort loop som börjar tidigt.
+"""Writes the --keep list for pack_bank.js: the sounds in an unpacked (BFP8) bank that have a short loop that starts early.
 
   node ../fm1-sf2/pack_bank.js roms/gen/m1_bfp8.fm1b roms/gen/m1_packed.fm1b --kbit 64 --flash 696288 --keep "$(python3 -I tools/m1_keep.py roms/gen/m1_bfp8.fm1b)"
 
-En MP3-kodad kort loop går inte att slinga sömlöst (uthållna toner på Organ 2, A.Bass, Kalimba lät som en dålig samplingloop), så ljud med
-en loop under 130 sampel som börjar inom de 3000 första samplen ligger förlustfritt (BFP8): 94 ljud, 81 KB. Se docs/M1_PROGRAMS.md.
-Ljudens nummer är pack_bank.js:s (s0, s1 ...: sorterade efter plats i banken).
+A short MP3-encoded loop cannot be looped seamlessly (sustained notes on Organ 2, A.Bass, Kalimba sounded like a bad sample loop), so sounds with
+a loop under 130 samples that starts within the first 3000 samples are kept lossless (BFP8): 94 sounds, 81 KB. See docs/M1_PROGRAMS.md.
+The sounds' numbers are pack_bank.js's (s0, s1 ...: sorted by position in the bank).
 """
 import struct, sys
 
@@ -17,7 +17,7 @@ def main():
         sys.exit(__doc__)
     b = open(sys.argv[1], "rb").read()
     if b[:4] != b"FM1B":
-        sys.exit("ingen FM1B-bank")
+        sys.exit("not an FM1B bank")
     nz = struct.unpack_from("<H", b, 14)[0]
     off_zone = struct.unpack_from("<I", b, 32)[0]
     sounds = {}
